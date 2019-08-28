@@ -1,0 +1,6 @@
+mnt/
+catboost_info/
+tags*
+*__pycache__*
+
+notebooks/.ipynb_checkpoints/
