@@ -4,6 +4,7 @@ from multiprocessing import cpu_count
 
 from ..datasets import CellularImageDataset
 from ..models import resnet18
+from ..schedulers import pass_scheduler
 from ..utils.logs import sel_log
 
 
@@ -11,8 +12,12 @@ class Runner(object):
     def __init__(self, config, logger):
         self.exp_id = config['exp_id']
         self.device = config['device']
-        self.fobj = self._get_fobj(config['train']['fobj'])
-        self.optimizer, self.model = self._build_model()
+        self.batch_size = config['batch_size']
+        self.max_epoch = config['max_epoch']
+        self.sampler_type = config['sampler']['sampler_type']
+        self.fobj = self._get_fobj(config['fobj'])
+        self.optimizer, self.model = self._build_model(
+            config['model'], config['optimizer'])
         self.histries = {
             'train_loss': [],
             'train_acc': [],
@@ -64,37 +69,35 @@ class Runner(object):
         )
         return model, optimizer
 
-    def _build_loader(self, mode, ids, root_dir, augment):
-        dataset = CellularImageDataset(mode=mode)
-
+    def _get_sampler(self, dataset, mode, sampler_type):
         if mode == "train":
-            drop_last_flag = True
-            sampler = torch.utils.data.sampler.RandomSampler(
-                data_source=dataset.image_files)
-
-            # if you want to sample data based on metric weight, use below
-            # sampler.
-            """
-            sampler = torch.utils.data.sampler.WeightedRandomSampler(
-                dataset.class_weight, dataset.__len__()
-            )
-            """
-
+            if sampler_type == 'random':
+                sampler = torch.utils.data.sampler.RandomSampler(
+                    data_source=dataset.image_files)
+            elif sampler_type == 'weighted':
+                sampler = torch.utils.data.sampler.WeightedRandomSampler(
+                    dataset.class_weight, dataset.__len__()
+                )
+            else:
+                raise Exception(f'invalid sampler_type: {sampler_type}')
         else:  # valid, test
             drop_last_flag = False
             sampler = torch.utils.data.sampler.SequentialSampler(
                 data_source=dataset.image_files)
 
+    def _build_loader(self, mode, ids, root_dir, augment):
+        dataset = CellularImageDataset(mode, ids, root_dir, augment)
+        sampler = self._get_sampler(dataset, mode, self.sampler_type)
+        drop_last = True if mode == 'train' else False
         loader = DataLoader(
             dataset,
-            batch_size=BATCH_SIZE,
+            batch_size=self.batch_size,
             sampler=sampler,
             num_workers=cpu_count(),
             worker_init_fn=lambda x: np.random.seed(),
-            drop_last=drop_last_flag,
+            drop_last=drop_last,
             pin_memory=True,
         )
-
         return loader
 
     def _calc_accuracy(self, preds, labels):
