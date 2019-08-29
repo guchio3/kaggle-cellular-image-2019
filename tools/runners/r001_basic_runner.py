@@ -209,8 +209,22 @@ class Runner(object):
 
         scheduler = self._get_scheduler(self.scheduler_type, self.max_epoch)
 
+        # checkpoint を読む
+        if self.checkpoint:
+            sel_log(f'loading checkpoint from {self.checkpoint} ...')
+            checkpoint = self.load_checkpoint(self.checkpoint)
+            current_epoch = checkpoint['current_epoch']
+            self.model = checkpoint['model']
+            self.optimizer = checkpoint['optimizer']
+            self.histories = checkpoint['histories']
+            scheduler = checkpoint['scheduler']
+            iter_epochs = range(current_epoch + 1, self.max_epoch + 1, 1)
+        else:
+            iter_epochs = range(1, self.max_epoch + 1, 1)
+
         epoch_start_time = time.time()
-        for current_epoch in range(1, self.max_epoch + 1, 1):
+        sel_log('start tringing !')
+        for current_epoch in iter_epochs:
             start_time = time.time()
             train_loss = self._train_loop(train_loader)
             valid_loss, valid_acc = self._valid_loop(valid_loader)
