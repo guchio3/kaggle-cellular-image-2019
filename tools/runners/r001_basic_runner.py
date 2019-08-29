@@ -1,5 +1,6 @@
 import datetime
 import time
+from glob import glob
 from multiprocessing import cpu_count
 
 import numpy as np
@@ -210,12 +211,12 @@ class Runner(object):
 
         return test_preds
 
-    def _load_checkpoint(cp_filename):
+    def _load_checkpoint(self, cp_filename):
         return torch.load(cp_filename)
 
     def _save_checkpoint(self, current_epoch, val_loss, val_acc):
         # pth means pytorch
-        cp_fliname = f'./mnt/checkpoints/{self.exp_id}/' \
+        cp_filename = f'./mnt/checkpoints/{self.exp_id}/' \
             f'epoch_{current_epoch}_{val_loss:.5f}' \
             f'_{val_acc:.5f}_checkpoint.pth'
         cp_dict = {
@@ -225,11 +226,17 @@ class Runner(object):
             'scheduler_state_dict': self.scheduler.state_dict(),
             'histories': self.histories,
         }
-        sel_log(f'now saving checkpoint to {cp_fliname} ...', self.logger)
+        sel_log(f'now saving checkpoint to {cp_filename} ...', self.logger)
         torch.save(cp_dict, cp_filename)
 
-    def _load_best_model():
-        self.
+    def _load_best_model(self):
+        best_epoch = np.argmax(self.histories['val_acc'])
+        best_cp_filename = glob(
+            f'./mnt/checkpoints/{self.exp_id}/epoch_{best_epoch}*')[0]
+        best_checkpoint = self._load_checkpoint(best_cp_filename)
+        self.model.load_state_dict(best_checkpoint['model_state_dict'])
+        best_loss = self.histories['val_loss'][best_epoch]
+        best_acc = self.histories['val_acc'][best_epoch]
         return best_loss, best_acc
 
     # -------
@@ -273,7 +280,7 @@ class Runner(object):
             self.histries['valid_acc'].append(valid_acc)
 
             self.scheduler.step()
-            self._save_checkpoint()
+            self._save_checkpoint(current_epoch, valid_loss, valid_acc)
 
         self.trn_time = int(time.time() - epoch_start_time) // 60
 
