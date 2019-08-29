@@ -31,7 +31,7 @@ class Runner(object):
         self.fobj = self._get_fobj(config['fobj'])
         self.optimizer, self.model = self._build_model(
             config['model'], config['optimizer'])
-        scheduler = self._get_scheduler(
+        self.scheduler = self._get_scheduler(
             config['scheduler']['scheduler_type'], self.max_epoch)
         self.sampler_type = config['sampler']['sampler_type']
         self.histries = {
