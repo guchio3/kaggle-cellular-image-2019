@@ -17,15 +17,22 @@ from ..utils.logs import sel_log, send_line_notification
 
 
 class Runner(object):
-    def __init__(self, config, logger):
-        self.exp_id = config['exp_id']
+    def __init__(self, config, args, logger):
+        # set args info
+        self.exp_id = args['exp_id']
+        self.checkpoint = args['checkpoint']
+
+        # set config info, and build
+        self.exp_time = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
         self.device = config['device']
         self.batch_size = config['batch_size']
         self.max_epoch = config['max_epoch']
-        self.sampler_type = config['sampler']['sampler_type']
         self.fobj = self._get_fobj(config['fobj'])
         self.optimizer, self.model = self._build_model(
             config['model'], config['optimizer'])
+        scheduler = self._get_scheduler(
+            config['scheduler']['scheduler_type'], self.max_epoch)
+        self.sampler_type = config['sampler']['sampler_type']
         self.histries = {
             'train_loss': [],
             'valid_loss': [],
@@ -76,6 +83,29 @@ class Runner(object):
         )
         return model, optimizer
 
+    def _get_scheduler(self, scheduler_type, max_epoch):
+        if scheduler_type == 'pass':
+            scheduler = pass_scheduler()
+        elif scheduler_type == 'multistep':
+            scheduler = optim.lr_scheduler.MultiStepLR(
+                self.optimizer,
+                milestones=[
+                    int(max_epoch * 0.8),
+                    int(max_epoch * 0.9)
+                ],
+                gamma=0.1
+            )
+        elif scheduler_type == 'cosine':
+            # scheduler examples:
+            #     [http://katsura-jp.hatenablog.com/entry/2019/01/30/183501]
+            # if you want to use cosine annealing, use below scheduler.
+            scheduler = optim.lr_scheduler.CosineAnnealingLR(
+                self.optimizer, T_max=max_epoch, eta_min=0.0001
+            )
+        else:
+            raise Exception(f'invalid scheduler_type: {scheduler_type}')
+        return scheduler
+
     def _get_sampler(self, dataset, mode, sampler_type):
         if mode == "train":
             if sampler_type == 'random':
@@ -108,33 +138,13 @@ class Runner(object):
         return loader
 
     def _calc_accuracy(self, preds, labels):
-        score = 0
-        for (pred, label) in zip(preds, labels):
-            if pred == label:
-                score += 1
-        return score / len(labels)
-
-    def _get_scheduler(self, scheduler_type, max_epoch):
-        if scheduler_type == 'pass':
-            scheduler = pass_scheduler()
-        elif scheduler_type == 'multistep':
-            scheduler = optim.lr_scheduler.MultiStepLR(
-                self.optimizer,
-                milestones=[
-                    int(max_epoch * 0.8),
-                    int(max_epoch * 0.9)
-                ],
-                gamma=0.1
-            )
-        elif scheduler_type == 'cosine':
-            # scheduler examples: [http://katsura-jp.hatenablog.com/entry/2019/01/30/183501]
-            # if you want to use cosine annealing, use below scheduler.
-            scheduler = optim.lr_scheduler.CosineAnnealingLR(
-                self.optimizer, T_max=max_epoch, eta_min=0.0001
-            )
-        else:
-            raise Exception(f'invalid scheduler_type: {scheduler_type}')
-        return scheduler
+        return (preds == labels).mean()
+#     def _calc_accuracy(self, preds, labels):
+#         score = 0
+#         for (pred, label) in zip(preds, labels):
+#             if pred == label:
+#                 score += 1
+#         return score / len(labels)
 
     def _train_loop(self, loader):
         self.model.train()
@@ -200,6 +210,28 @@ class Runner(object):
 
         return test_preds
 
+    def _load_checkpoint(cp_filename):
+        return torch.load(cp_filename)
+
+    def _save_checkpoint(self, current_epoch, val_loss, val_acc):
+        # pth means pytorch
+        cp_fliname = f'./mnt/checkpoints/{self.exp_id}/' \
+            f'epoch_{current_epoch}_{val_loss:.5f}' \
+            f'_{val_acc:.5f}_checkpoint.pth'
+        cp_dict = {
+            'current_epoch': current_epoch,
+            'model_state_dict': self.model.state_dict(),
+            'optim_state_dict': self.optimizer.state_dict(),
+            'scheduler_state_dict': self.scheduler.state_dict(),
+            'histories': self.histories,
+        }
+        sel_log(f'now saving checkpoint to {cp_fliname} ...', self.logger)
+        torch.save(cp_dict, cp_filename)
+
+    def _load_best_model():
+        self.
+        return best_loss, best_acc
+
     # -------
 
     def train_model(self):
@@ -207,23 +239,22 @@ class Runner(object):
         train_loader = self._build_loader(mode="train")
         valid_loader = self._build_loader(mode="valid")
 
-        scheduler = self._get_scheduler(self.scheduler_type, self.max_epoch)
-
-        # checkpoint を読む
+        # load and apply checkpoint if needed
         if self.checkpoint:
-            sel_log(f'loading checkpoint from {self.checkpoint} ...')
+            sel_log(f'loading checkpoint from {self.checkpoint} ...',
+                    self.logger)
             checkpoint = self.load_checkpoint(self.checkpoint)
             current_epoch = checkpoint['current_epoch']
-            self.model = checkpoint['model']
-            self.optimizer = checkpoint['optimizer']
+            self.model.load_state_dict(checkpoint['model_state_dict'])
+            self.optimizer.load_state_dict(checkpoint['optim_state_dict'])
+            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
             self.histories = checkpoint['histories']
-            scheduler = checkpoint['scheduler']
             iter_epochs = range(current_epoch + 1, self.max_epoch + 1, 1)
         else:
             iter_epochs = range(1, self.max_epoch + 1, 1)
 
         epoch_start_time = time.time()
-        sel_log('start tringing !')
+        sel_log('start tringing !', self.logger)
         for current_epoch in iter_epochs:
             start_time = time.time()
             train_loss = self._train_loop(train_loader)
@@ -241,14 +272,14 @@ class Runner(object):
             self.histries['valid_loss'].append(valid_loss)
             self.histries['valid_acc'].append(valid_acc)
 
-            scheduler.step()
-            self.save_checkpoint()
+            self.scheduler.step()
+            self._save_checkpoint()
 
         self.trn_time = int(time.time() - epoch_start_time) // 60
 
     def make_submission_file(self):
         test_loader = self._build_loader(mode="test")
-        best_loss, best_acc = self._load_best_checkpoint()
+        best_loss, best_acc = self._load_best_model()
         test_preds = self._test_loop(test_loader)
 
         submission_df = pd.read_csv(
@@ -259,7 +290,7 @@ class Runner(object):
         sub_filename = f'./mnt/submissions/{filename_base}_sub.csv'
         submission_df.to_csv(sub_filename, index=False)
 
-        sel_log(f'Saved submission file to {sub_filename} !')
+        sel_log(f'Saved submission file to {sub_filename} !', self.logger)
         line_message = f'Finished the whole pipeline ! \n' \
             f'Training time : {self.trn_time} min \n' \
             f'Best valid loss : {best_loss:.5f} \n' \
