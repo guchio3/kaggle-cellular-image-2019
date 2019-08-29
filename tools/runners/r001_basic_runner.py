@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from ..datasets import CellularImageDataset
 from ..models import resnet18
 from ..schedulers import pass_scheduler
-from ..utils.logs import sel_log
+from ..utils.logs import sel_log, send_line_notification
 
 
 class Runner(object):
@@ -28,7 +28,6 @@ class Runner(object):
             config['model'], config['optimizer'])
         self.histries = {
             'train_loss': [],
-            'train_acc': [],
             'valid_loss': [],
             'valid_acc': [],
         }
@@ -164,7 +163,6 @@ class Runner(object):
         running_loss = 0
 
         valid_preds, valid_labels = [], []
-
         for (images, labels) in loader:
             images, labels = images.to(self.device), labels.to(self.device)
             outputs = self.model.forward(images)
@@ -211,37 +209,48 @@ class Runner(object):
 
         scheduler = self._get_scheduler(self.scheduler_type, self.max_epoch)
 
+        epoch_start_time = time.time()
         for current_epoch in range(1, self.max_epoch + 1, 1):
             start_time = time.time()
-            train_loss, train_acc = self._train_loop(train_loader)
+            train_loss = self._train_loop(train_loader)
             valid_loss, valid_acc = self._valid_loop(valid_loader)
 
             sel_log(
                 f'epoch: {current_epoch} / '
                 + f'train loss: {train_loss:.5f} / '
-                + f'train acc: {train_acc:.5f} / '
                 + f'valid loss: {valid_loss:.5f} / '
                 + f'valid acc: {valid_acc:.5f} / '
                 + f'lr: {self.optimizer.param_groups[0]["lr"]:.5f} / '
                 + f'time: {int(time.time()-start_time)}sec', self.logger)
 
             self.histries['train_loss'].append(train_loss)
-            self.histries['train_acc'].append(train_acc)
             self.histries['valid_loss'].append(valid_loss)
             self.histries['valid_acc'].append(valid_acc)
 
             scheduler.step()
+            self.save_checkpoint()
+
+        self.trn_time = int(time.time() - epoch_start_time) // 60
 
     def make_submission_file(self):
         test_loader = self._build_loader(mode="test")
+        best_loss, best_acc = self._load_best_checkpoint()
         test_preds = self._test_loop(test_loader)
 
-        submission_df = pd.read_csv("../input/sample_submission.csv")
-        submission_df["label"] = test_preds
-        submission_df.to_csv("./submission.csv", index=False)
+        submission_df = pd.read_csv(
+            './mnt/inputs/origin/sample_submission.csv')
+        submission_df['label'] = test_preds
+        filename_base = f'{self.exp_id}_{self.exp_time}_' \
+            f'{best_loss:.5f}_{best_acc:.5f}'
+        sub_filename = f'./mnt/submissions/{filename_base}_sub.csv'
+        submission_df.to_csv(sub_filename, index=False)
 
-        print("---submission.csv---")
-        print(submission_df.head())
+        sel_log(f'Saved submission file to {sub_filename} !')
+        line_message = f'Finished the whole pipeline ! \n' \
+            f'Training time : {self.trn_time} min \n' \
+            f'Best valid loss : {best_loss:.5f} \n' \
+            f'Best valid acc : {best_acc:.5f}'
+        send_line_notification(line_message)
 
     def plot_history(self):
         raise NotImplementedError()
