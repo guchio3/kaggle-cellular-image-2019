@@ -9,6 +9,8 @@ class Network(nn.Module):
         # [https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py]
         model = torchvision.models.resnet18(pretrained=pretrained)
 
+        self.conv0 = nn.Conv2d(6, 3, kernel_size=3, stride=1, padding=1)
+        self.bn0 = nn.BatchNorm2d(3)
         self.conv1 = model.conv1
         self.bn1 = model.bn1
         self.relu = model.relu
@@ -26,6 +28,9 @@ class Network(nn.Module):
             self._init_weight()
 
     def forward(self, x):
+        x = self.conv0(x)
+        x = self.bn0(x)
+        x = self.relu(x)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)

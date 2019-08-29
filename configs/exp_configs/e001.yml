@@ -1,0 +1,18 @@
+runner: r001
+device: cuda
+batch_size: 24
+max_epoch: 20
+fobj: ce
+model:
+    model_type: resnet18
+    pretrained: true
+optimizer: 
+    optim_type: adam
+    lr: 0.01
+scheduler:
+    scheduler_type: pass
+sampler:
+    sampler_type: random
+split: 
+    split_type: skf
+    split_num: 5

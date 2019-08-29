@@ -3,6 +3,38 @@ import argparse
 from .logs import sel_log
 
 
+def parse_args(logger=None):
+    '''
+    Policy
+    ------------
+    * experiment id must be required
+
+    '''
+    parser = argparse.ArgumentParser(
+        prog='XXX.py',
+        usage='ex) python -e e001 -d -m "e001, basic experiment"',
+        description='short explanation of args',
+        add_help=True,
+    )
+    parser.add_argument('-e', '--exp_id',
+                        help='experiment setting',
+                        type=str,
+                        required=True)
+    parser.add_argument('-t', '--checkpoint',
+                        help='the checkpoint u use',
+                        type=str,
+                        required=False,
+                        default=None)
+    parser.add_argument('-m', '--message',
+                        help='messages about the process',
+                        type=str,
+                        default='')
+
+    args = parser.parse_args()
+    sel_log(f'args: {sorted(vars(args).items())}', logger)
+    return args
+
+
 def parse_test_args(logger=None):
     '''
     Policy

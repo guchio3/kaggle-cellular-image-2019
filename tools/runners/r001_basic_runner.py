@@ -1,3 +1,4 @@
+import os
 import datetime
 import time
 from glob import glob
@@ -5,6 +6,8 @@ from multiprocessing import cpu_count
 
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import GroupKFold as gkf
+from sklearn.model_selection import StratifiedKFold as skf
 
 import torch
 import torch.nn as nn
@@ -20,8 +23,8 @@ from ..utils.logs import sel_log, send_line_notification
 class Runner(object):
     def __init__(self, config, args, logger):
         # set args info
-        self.exp_id = args['exp_id']
-        self.checkpoint = args['checkpoint']
+        self.exp_id = args.exp_id
+        self.checkpoint = args.checkpoint
 
         # set config info, and build
         self.exp_time = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
@@ -29,12 +32,15 @@ class Runner(object):
         self.batch_size = config['batch_size']
         self.max_epoch = config['max_epoch']
         self.fobj = self._get_fobj(config['fobj'])
-        self.optimizer, self.model = self._build_model(
+        self.model, self.optimizer = self._build_model(
             config['model'], config['optimizer'])
         self.scheduler = self._get_scheduler(
             config['scheduler']['scheduler_type'], self.max_epoch)
         self.sampler_type = config['sampler']['sampler_type']
-        self.histries = {
+        self.split_type = config['split']['split_type']
+        self.split_num = config['split']['split_num']
+        self.logger = logger
+        self.histories = {
             'train_loss': [],
             'valid_loss': [],
             'valid_acc': [],
@@ -111,7 +117,8 @@ class Runner(object):
         if mode == "train":
             if sampler_type == 'random':
                 sampler = torch.utils.data.sampler.RandomSampler(
-                    data_source=dataset.image_files)
+                    data_source=dataset)
+                    # data_source=dataset.image_files)
             elif sampler_type == 'weighted':
                 sampler = torch.utils.data.sampler.WeightedRandomSampler(
                     dataset.class_weight, dataset.__len__()
@@ -120,18 +127,20 @@ class Runner(object):
                 raise Exception(f'invalid sampler_type: {sampler_type}')
         else:  # valid, test
             sampler = torch.utils.data.sampler.SequentialSampler(
-                data_source=dataset.image_files)
+                data_source=dataset)
+                # data_source=dataset.image_files)
         return sampler
 
-    def _build_loader(self, mode, ids, root_dir, augment):
-        dataset = CellularImageDataset(mode, ids, root_dir, augment)
+    def _build_loader(self, mode, ids, augment):
+        dataset = CellularImageDataset(mode, ids, augment)
         sampler = self._get_sampler(dataset, mode, self.sampler_type)
         drop_last = True if mode == 'train' else False
         loader = DataLoader(
             dataset,
             batch_size=self.batch_size,
             sampler=sampler,
-            num_workers=cpu_count(),
+            # num_workers=cpu_count(),
+            num_workers=0,
             worker_init_fn=lambda x: np.random.seed(),
             drop_last=drop_last,
             pin_memory=True,
@@ -139,7 +148,7 @@ class Runner(object):
         return loader
 
     def _calc_accuracy(self, preds, labels):
-        return (preds == labels).mean()
+        return (preds == labels).numpy().mean()
 #     def _calc_accuracy(self, preds, labels):
 #         score = 0
 #         for (pred, label) in zip(preds, labels):
@@ -152,11 +161,11 @@ class Runner(object):
         running_loss = 0
 
         for (images, labels) in loader:
-            images, labels = images.to(self.device), labels.to(self.device)
+            images, labels = images.to(self.device, dtype=torch.float), labels.to(self.device)
 
             outputs = self.model.forward(images)
 
-            train_loss = self.criterion(outputs, labels)
+            train_loss = self.fobj(outputs, labels)
 
             self.optimizer.zero_grad()
             train_loss.backward()
@@ -175,7 +184,7 @@ class Runner(object):
 
         valid_preds, valid_labels = [], []
         for (images, labels) in loader:
-            images, labels = images.to(self.device), labels.to(self.device)
+            images, labels = images.to(self.device, dtype=torch.float), labels.to(self.device)
             outputs = self.model.forward(images)
             valid_loss = self.fobj(outputs, labels)
             running_loss += valid_loss.item()
@@ -201,7 +210,7 @@ class Runner(object):
         test_preds = []
 
         for (images, labels) in loader:
-            images, labels = images.to(self.device), labels.to(self.device)
+            images, labels = images.to(self.device, dtype=torch.float), labels.to(self.device)
             outputs = self.model.forward(images)
             _, predicted = torch.max(outputs.data, 1)
 
@@ -215,6 +224,8 @@ class Runner(object):
         return torch.load(cp_filename)
 
     def _save_checkpoint(self, current_epoch, val_loss, val_acc):
+        if not os.path.exists(f'./mnt/checkpoints/{self.exp_id}'):
+            os.makedirs(f'./mnt/checkpoints/{self.exp_id}')
         # pth means pytorch
         cp_filename = f'./mnt/checkpoints/{self.exp_id}/' \
             f'epoch_{current_epoch}_{val_loss:.5f}' \
@@ -239,12 +250,32 @@ class Runner(object):
         best_acc = self.histories['val_acc'][best_epoch]
         return best_loss, best_acc
 
+    def _trn_val_split(self, split_type, split_num):
+        trn_df = pd.read_csv('./mnt/inputs/origin/train.csv.zip')
+        if split_type == 'gkf':
+            fold = gkf(split_num).split(
+                trn_df['id_code'], trn_df['sirna'], trn_df['well'])
+        elif split_type == 'skf':
+            fold = skf(split_num, shuffle=True, random_state=71)\
+                .split(trn_df['id_code'], trn_df['sirna'])
+        else:
+            raise Exception(f'invalid split type: {split_type}')
+        for _trn_idx, _val_idx in fold:
+            trn_idx = trn_df.iloc[_trn_idx].id_code
+            val_idx = trn_df.iloc[_val_idx].id_code
+            break
+        return trn_idx, val_idx
+
     # -------
 
     def train_model(self):
         # TODO
-        train_loader = self._build_loader(mode="train")
-        valid_loader = self._build_loader(mode="valid")
+        trn_ids, val_ids = self._trn_val_split(self.split_type, self.split_num)
+
+        train_loader = self._build_loader(
+            mode="train", ids=trn_ids, augment=None)
+        valid_loader = self._build_loader(
+            mode="train", ids=val_ids, augment=None)
 
         # load and apply checkpoint if needed
         if self.checkpoint:
@@ -261,7 +292,7 @@ class Runner(object):
             iter_epochs = range(1, self.max_epoch + 1, 1)
 
         epoch_start_time = time.time()
-        sel_log('start tringing !', self.logger)
+        sel_log('start trainging !', self.logger)
         for current_epoch in iter_epochs:
             start_time = time.time()
             train_loss = self._train_loop(train_loader)
@@ -275,9 +306,9 @@ class Runner(object):
                 + f'lr: {self.optimizer.param_groups[0]["lr"]:.5f} / '
                 + f'time: {int(time.time()-start_time)}sec', self.logger)
 
-            self.histries['train_loss'].append(train_loss)
-            self.histries['valid_loss'].append(valid_loss)
-            self.histries['valid_acc'].append(valid_acc)
+            self.histories['train_loss'].append(train_loss)
+            self.histories['valid_loss'].append(valid_loss)
+            self.histories['valid_acc'].append(valid_acc)
 
             self.scheduler.step()
             self._save_checkpoint(current_epoch, valid_loss, valid_acc)

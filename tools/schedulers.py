@@ -4,3 +4,6 @@ class pass_scheduler:
 
     def step(self):
         pass
+
+    def state_dict(self):
+        return {}
