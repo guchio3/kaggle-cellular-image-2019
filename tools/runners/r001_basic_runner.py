@@ -2,6 +2,14 @@ import datetime
 import time
 from multiprocessing import cpu_count
 
+import numpy as np
+import pandas as pd
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader
+
 from ..datasets import CellularImageDataset
 from ..models import resnet18
 from ..schedulers import pass_scheduler
@@ -81,9 +89,9 @@ class Runner(object):
             else:
                 raise Exception(f'invalid sampler_type: {sampler_type}')
         else:  # valid, test
-            drop_last_flag = False
             sampler = torch.utils.data.sampler.SequentialSampler(
                 data_source=dataset.image_files)
+        return sampler
 
     def _build_loader(self, mode, ids, root_dir, augment):
         dataset = CellularImageDataset(mode, ids, root_dir, augment)
@@ -101,38 +109,40 @@ class Runner(object):
         return loader
 
     def _calc_accuracy(self, preds, labels):
-        # TODO
         score = 0
-        total = 0
-
         for (pred, label) in zip(preds, labels):
             if pred == label:
-                score += CLASS_WEIGHT[label]
-            total += CLASS_WEIGHT[label]
+                score += 1
+        return score / len(labels)
 
-        return score / total
-
-    def _get_scheduler(self, scheduler_type, ):
+    def _get_scheduler(self, scheduler_type, max_epoch):
         if scheduler_type == 'pass':
-            scheduler =
-        scheduler = optim.lr_scheduler.MultiStepLR(
-            self.optimizer, milestones=[int(EPOCH * 0.8), int(EPOCH * 0.9)], gamma=0.1
-        )
-
-        # scheduler examples: [http://katsura-jp.hatenablog.com/entry/2019/01/30/183501]
-        # if you want to use cosine annealing, use below scheduler.
-        """
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, T_max=EPOCH, eta_min=0.0001
-        )
-        """
+            scheduler = pass_scheduler()
+        elif scheduler_type == 'multistep':
+            scheduler = optim.lr_scheduler.MultiStepLR(
+                self.optimizer,
+                milestones=[
+                    int(max_epoch * 0.8),
+                    int(max_epoch * 0.9)
+                ],
+                gamma=0.1
+            )
+        elif scheduler_type == 'cosine':
+            # scheduler examples: [http://katsura-jp.hatenablog.com/entry/2019/01/30/183501]
+            # if you want to use cosine annealing, use below scheduler.
+            scheduler = optim.lr_scheduler.CosineAnnealingLR(
+                self.optimizer, T_max=max_epoch, eta_min=0.0001
+            )
+        else:
+            raise Exception(f'invalid scheduler_type: {scheduler_type}')
+        return scheduler
 
     def _train_loop(self, loader):
         self.model.train()
         running_loss = 0
 
         for (images, labels) in loader:
-            images, labels = images.to(DEVICE), labels.to(DEVICE)
+            images, labels = images.to(self.device), labels.to(self.device)
 
             outputs = self.model.forward(images)
 
@@ -156,9 +166,9 @@ class Runner(object):
         valid_preds, valid_labels = [], []
 
         for (images, labels) in loader:
-            images, labels = images.to(DEVICE), labels.to(DEVICE)
+            images, labels = images.to(self.device), labels.to(self.device)
             outputs = self.model.forward(images)
-            valid_loss = self.criterion(outputs, labels)
+            valid_loss = self.fobj(outputs, labels)
             running_loss += valid_loss.item()
 
             _, predicted = torch.max(outputs.data, 1)
@@ -170,11 +180,11 @@ class Runner(object):
 
         valid_preds = torch.cat(valid_preds)
         valid_labels = torch.cat(valid_labels)
-        valid_weighted_accuracy = self._calc_weighted_accuracy(
+        valid_accuracy = self._calc_accuracy(
             valid_preds, valid_labels
         )
 
-        return valid_loss, valid_weighted_accuracy
+        return valid_loss, valid_accuracy
 
     def _test_loop(self, loader):
         self.model.eval()
@@ -182,7 +192,7 @@ class Runner(object):
         test_preds = []
 
         for (images, labels) in loader:
-            images, labels = images.to(DEVICE), labels.to(DEVICE)
+            images, labels = images.to(self.device), labels.to(self.device)
             outputs = self.model.forward(images)
             _, predicted = torch.max(outputs.data, 1)
 
@@ -199,24 +209,26 @@ class Runner(object):
         train_loader = self._build_loader(mode="train")
         valid_loader = self._build_loader(mode="valid")
 
-        for current_epoch in range(1, EPOCH + 1, 1):
+        scheduler = self._get_scheduler(self.scheduler_type, self.max_epoch)
+
+        for current_epoch in range(1, self.max_epoch + 1, 1):
             start_time = time.time()
-            train_loss = self._train_loop(train_loader)
-            valid_loss, valid_weighted_accuracy = self._valid_loop(
-                valid_loader)
+            train_loss, train_acc = self._train_loop(train_loader)
+            valid_loss, valid_acc = self._valid_loop(valid_loader)
 
             sel_log(
                 f'epoch: {current_epoch} / '
                 + f'train loss: {train_loss:.5f} / '
+                + f'train acc: {train_acc:.5f} / '
                 + f'valid loss: {valid_loss:.5f} / '
-                + f'valid w-acc: {valid_weighted_accuracy:.5f} / '
+                + f'valid acc: {valid_acc:.5f} / '
                 + f'lr: {self.optimizer.param_groups[0]["lr"]:.5f} / '
                 + f'time: {int(time.time()-start_time)}sec', self.logger)
 
-            self.train_loss_history.append(train_loss)
-            self.valid_loss_history.append(valid_loss)
-            self.valid_weighted_accuracy_history.append(
-                valid_weighted_accuracy)
+            self.histries['train_loss'].append(train_loss)
+            self.histries['train_acc'].append(train_acc)
+            self.histries['valid_loss'].append(valid_loss)
+            self.histries['valid_acc'].append(valid_acc)
 
             scheduler.step()
 
