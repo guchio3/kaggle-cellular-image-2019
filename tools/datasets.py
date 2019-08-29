@@ -1,18 +1,39 @@
-from tqdm import tqdm
+import gc
+import os
+from functools import partial
+from itertools import chain
+from multiprocessing import Pool
 
 import cv2
 import numpy as np
 import pandas as pd
-
 # import rxrx.io as rio
 import torch
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 from .utils.logs import sel_log
 
 # sys.path.append('../tools/utils/rxrx1-utils')
 
 IMAGE_SIZE = 512
+
+
+def _load_imgs_from_ids(id_pair, mode):
+    _id, label = id_pair
+    images = []
+    split_id = _id.split('_')
+    filename_base = f'./mnt/inputs/{mode}/{split_id[0]}/' \
+                    f'Plate{split_id[1]}/{split_id[2]}'
+    for site in [1, 2]:
+        _images = []
+        for w in [1, 2, 3, 4, 5, 6]:
+            # 0 means gray scale
+            _images.append(
+                cv2.imread(f'{filename_base}_s{site}_w{w}.png', 0))
+        images.append(
+            np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6))
+    return images
 
 
 class CellularImageDataset(Dataset):
@@ -49,25 +70,21 @@ class CellularImageDataset(Dataset):
 
         return (torch.tensor(img), torch.tensor(self.labels[idx]))
 
-    def __load_imgs_from_ids(id_pair):
-
     def _parse_ids(self, mode, ids, original_labels):
         assert len(ids) == len(original_labels)
-        images, labels = [], []
+        images = []
+        # 2 mean sites
+        labels = list(chain.from_iterable(
+            [[label] * 2 for label in original_labels]))
         sel_log('now loading images ...', self.logger)
-        for _id, label in tqdm(list(zip(ids, original_labels))[:100]):
-            split_id = _id.split('_')
-            filename_base = f'./mnt/inputs/{mode}/{split_id[0]}/' \
-                            f'Plate{split_id[1]}/{split_id[2]}'
-            for site in [1, 2]:
-                _images = []
-                for w in [1, 2, 3, 4, 5, 6]:
-                    # 0 means gray scale
-                    _images.append(
-                        cv2.imread(f'{filename_base}_s{site}_w{w}.png', 0))
-                images.append(
-                    np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6))
-                labels.append(label)
+        with Pool(os.cpu_count()) as p:
+            # self だとエラー
+            iter_func = partial(_load_imgs_from_ids, mode=mode)
+            imap = p.imap_unordered(iter_func, list(zip(ids, original_labels)))
+            images = list(tqdm(imap, total=len(ids)))
+            p.close()
+            p.join()
+            gc.collect()
         images = np.array(images)
 
         return images, labels
