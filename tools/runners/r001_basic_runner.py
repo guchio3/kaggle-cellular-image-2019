@@ -1,17 +1,16 @@
-import os
 import datetime
+import os
 import time
 from glob import glob
-from multiprocessing import cpu_count
+from tqdm import tqdm
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import GroupKFold as gkf
-from sklearn.model_selection import StratifiedKFold as skf
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from sklearn.model_selection import GroupKFold as gkf
+from sklearn.model_selection import StratifiedKFold as skf
 from torch.utils.data import DataLoader
 
 from ..datasets import CellularImageDataset
@@ -23,8 +22,11 @@ from ..utils.logs import sel_log, send_line_notification
 class Runner(object):
     def __init__(self, config, args, logger):
         # set args info
+        # -1 for just prediction
+        self.trn_time = -1
         self.exp_id = args.exp_id
         self.checkpoint = args.checkpoint
+        self.debug = args.debug
 
         # set config info, and build
         self.exp_time = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
@@ -58,7 +60,7 @@ class Runner(object):
             model = resnet18.Network(pretrained, 1108)
         else:
             raise Exception(f'invalid model_type: {model_type}')
-        return model.to(self.device)
+        return torch.nn.DataParallel(model.to(self.device))
 
     def _get_optimizer(self, optim_type, lr, model):
         if optim_type == 'sgd':
@@ -118,7 +120,7 @@ class Runner(object):
             if sampler_type == 'random':
                 sampler = torch.utils.data.sampler.RandomSampler(
                     data_source=dataset)
-                    # data_source=dataset.image_files)
+                # data_source=dataset.image_files)
             elif sampler_type == 'weighted':
                 sampler = torch.utils.data.sampler.WeightedRandomSampler(
                     dataset.class_weight, dataset.__len__()
@@ -128,7 +130,7 @@ class Runner(object):
         else:  # valid, test
             sampler = torch.utils.data.sampler.SequentialSampler(
                 data_source=dataset)
-                # data_source=dataset.image_files)
+            # data_source=dataset.image_files)
         return sampler
 
     def _build_loader(self, mode, ids, augment):
@@ -160,8 +162,10 @@ class Runner(object):
         self.model.train()
         running_loss = 0
 
-        for (images, labels) in loader:
-            images, labels = images.to(self.device, dtype=torch.float), labels.to(self.device)
+        for (images, labels) in tqdm(loader):
+            images, labels = images.to(
+                self.device, dtype=torch.float), labels.to(
+                self.device)
 
             outputs = self.model.forward(images)
 
@@ -183,8 +187,10 @@ class Runner(object):
         running_loss = 0
 
         valid_preds, valid_labels = [], []
-        for (images, labels) in loader:
-            images, labels = images.to(self.device, dtype=torch.float), labels.to(self.device)
+        for (images, labels) in tqdm(loader):
+            images, labels = images.to(
+                self.device, dtype=torch.float), labels.to(
+                self.device)
             outputs = self.model.forward(images)
             valid_loss = self.fobj(outputs, labels)
             running_loss += valid_loss.item()
@@ -209,9 +215,14 @@ class Runner(object):
 
         test_preds = []
 
-        for (images, labels) in loader:
-            images, labels = images.to(self.device, dtype=torch.float), labels.to(self.device)
+        sel_log('predicting ...', self.logger)
+        for (images, labels) in tqdm(loader):
+            images, labels = images.to(
+                self.device, dtype=torch.float), labels.to(
+                self.device)
             outputs = self.model.forward(images)
+            # avg predictions
+            outputs = torch.mean(outputs.reshape((-1, 1108, 2)), 2)
             _, predicted = torch.max(outputs.data, 1)
 
             test_preds.append(predicted.cpu())
@@ -221,7 +232,12 @@ class Runner(object):
         return test_preds
 
     def _load_checkpoint(self, cp_filename):
-        return torch.load(cp_filename)
+        checkpoint = torch.load(cp_filename)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optim_state_dict'])
+        self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        self.histories = checkpoint['histories']
+        return checkpoint
 
     def _save_checkpoint(self, current_epoch, val_loss, val_acc):
         if not os.path.exists(f'./mnt/checkpoints/{self.exp_id}'):
@@ -240,14 +256,23 @@ class Runner(object):
         sel_log(f'now saving checkpoint to {cp_filename} ...', self.logger)
         torch.save(cp_dict, cp_filename)
 
+    def _search_best_filename(self):
+        best_loss = np.inf
+        best_acc = -1
+        best_filename = ''
+        for filename in glob(f'./mnt/checkpoints/{self.exp_id}/*'):
+            split_filename = filename.split('/')[-1].split('_')
+            temp_loss = float(split_filename[2])
+            temp_acc = float(split_filename[3])
+            if temp_acc > best_acc:
+                best_loss = temp_loss
+                best_acc = temp_acc
+                best_filename = filename
+        return best_filename, best_loss, best_acc
+
     def _load_best_model(self):
-        best_epoch = np.argmax(self.histories['val_acc'])
-        best_cp_filename = glob(
-            f'./mnt/checkpoints/{self.exp_id}/epoch_{best_epoch}*')[0]
-        best_checkpoint = self._load_checkpoint(best_cp_filename)
-        self.model.load_state_dict(best_checkpoint['model_state_dict'])
-        best_loss = self.histories['val_loss'][best_epoch]
-        best_acc = self.histories['val_acc'][best_epoch]
+        best_cp_filename, best_loss, best_acc = self._search_best_filename()
+        _ = self._load_checkpoint(best_cp_filename)
         return best_loss, best_acc
 
     def _trn_val_split(self, split_type, split_num):
@@ -260,17 +285,42 @@ class Runner(object):
                 .split(trn_df['id_code'], trn_df['sirna'])
         else:
             raise Exception(f'invalid split type: {split_type}')
-        for _trn_idx, _val_idx in fold:
-            trn_idx = trn_df.iloc[_trn_idx].id_code
-            val_idx = trn_df.iloc[_val_idx].id_code
+        for trn_idx, val_idx in fold:
+            trn_ids = trn_df.iloc[trn_idx].id_code
+            val_ids = trn_df.iloc[val_idx].id_code
             break
-        return trn_idx, val_idx
+        return trn_ids, val_ids
+
+    def _get_test_ids(self, ):
+        tst_df = pd.read_csv('./mnt/inputs/origin/test.csv')
+        tst_ids = tst_df.id_code
+        return tst_ids
+
+    def _warmup_setting(self, epoch):
+        if epoch == 1:
+            for name, child in self.model.module.named_children():
+                if name == 'fc':
+                    sel_log(name + ' is unfrozen', self.logger)
+                    for param in child.parameters():
+                        param.requires_grad = True
+                else:
+                    sel_log(name + ' is frozen', self.logger)
+                    for param in child.parameters():
+                        param.requires_grad = False
+        if epoch == 3:
+            sel_log("Turn on all the layers", self.logger)
+            for name, child in self.model.named_children():
+                for param in child.parameters():
+                    param.requires_grad = True
 
     # -------
 
     def train_model(self):
         # TODO
         trn_ids, val_ids = self._trn_val_split(self.split_type, self.split_num)
+        if self.debug:
+            trn_ids = trn_ids[:300]
+            val_ids = val_ids[:300]
 
         train_loader = self._build_loader(
             mode="train", ids=trn_ids, augment=None)
@@ -281,12 +331,8 @@ class Runner(object):
         if self.checkpoint:
             sel_log(f'loading checkpoint from {self.checkpoint} ...',
                     self.logger)
-            checkpoint = self.load_checkpoint(self.checkpoint)
+            checkpoint = self._load_checkpoint(self.checkpoint)
             current_epoch = checkpoint['current_epoch']
-            self.model.load_state_dict(checkpoint['model_state_dict'])
-            self.optimizer.load_state_dict(checkpoint['optim_state_dict'])
-            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-            self.histories = checkpoint['histories']
             iter_epochs = range(current_epoch + 1, self.max_epoch + 1, 1)
         else:
             iter_epochs = range(1, self.max_epoch + 1, 1)
@@ -294,6 +340,7 @@ class Runner(object):
         epoch_start_time = time.time()
         sel_log('start trainging !', self.logger)
         for current_epoch in iter_epochs:
+            self._warmup_setting(current_epoch)
             start_time = time.time()
             train_loss = self._train_loop(train_loader)
             valid_loss, valid_acc = self._valid_loop(valid_loader)
@@ -316,13 +363,17 @@ class Runner(object):
         self.trn_time = int(time.time() - epoch_start_time) // 60
 
     def make_submission_file(self):
-        test_loader = self._build_loader(mode="test")
+        tst_ids = self._get_test_ids()
+        if self.debug:
+            tst_ids = tst_ids[:300]
+        test_loader = self._build_loader(
+            mode="test", ids=tst_ids, augment=None)
         best_loss, best_acc = self._load_best_model()
         test_preds = self._test_loop(test_loader)
 
         submission_df = pd.read_csv(
             './mnt/inputs/origin/sample_submission.csv')
-        submission_df['label'] = test_preds
+        submission_df['sirna'] = test_preds
         filename_base = f'{self.exp_id}_{self.exp_time}_' \
             f'{best_loss:.5f}_{best_acc:.5f}'
         sub_filename = f'./mnt/submissions/{filename_base}_sub.csv'

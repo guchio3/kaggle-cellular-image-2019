@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torchvision
 
@@ -9,9 +10,20 @@ class Network(nn.Module):
         # [https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py]
         model = torchvision.models.resnet18(pretrained=pretrained)
 
-        self.conv0 = nn.Conv2d(6, 3, kernel_size=3, stride=1, padding=1)
-        self.bn0 = nn.BatchNorm2d(3)
-        self.conv1 = model.conv1
+        # self.conv0 = nn.Conv2d(6, 3, kernel_size=3, stride=1, padding=1)
+        # self.bn0 = nn.BatchNorm2d(3)
+        # self.conv1 = model.conv1
+        new_conv = nn.Conv2d(
+            6,
+            64,
+            kernel_size=7,
+            stride=2,
+            padding=3,
+            bias=False)
+        with torch.no_grad():
+            new_conv.weight[:, :] = torch.stack(
+                [torch.mean(model.conv1.weight, 1)] * 6, dim=1)
+        self.conv1 = new_conv
         self.bn1 = model.bn1
         self.relu = model.relu
         self.maxpool = model.maxpool
@@ -28,9 +40,9 @@ class Network(nn.Module):
             self._init_weight()
 
     def forward(self, x):
-        x = self.conv0(x)
-        x = self.bn0(x)
-        x = self.relu(x)
+#        x = self.conv0(x)
+#        x = self.bn0(x)
+#        x = self.relu(x)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -45,6 +57,10 @@ class Network(nn.Module):
         out = self.fc(x.squeeze())
 
         return out
+
+    def named_children(self):
+        for name, module in self._modules.items():
+            yield name, module
 
     def _init_weight(self):
         for m in self.modules():

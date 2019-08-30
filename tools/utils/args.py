@@ -25,11 +25,15 @@ def parse_args(logger=None):
                         type=str,
                         required=False,
                         default=None)
+
     parser.add_argument('-m', '--message',
                         help='messages about the process',
                         type=str,
                         default='')
-
+    parser.add_argument('-d', '--debug',
+                        help='whether or not to use debug mode',
+                        action='store_true',
+                        default=False)
     args = parser.parse_args()
     sel_log(f'args: {sorted(vars(args).items())}', logger)
     return args

@@ -1,7 +1,7 @@
 runner: r001
 device: cuda
-batch_size: 24
-max_epoch: 20
+batch_size: 64
+max_epoch: 40
 fobj: ce
 model:
     model_type: resnet18

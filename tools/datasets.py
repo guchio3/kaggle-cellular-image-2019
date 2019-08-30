@@ -71,6 +71,8 @@ class CellularImageDataset(Dataset):
         return (torch.tensor(img), torch.tensor(self.labels[idx]))
 
     def _parse_ids(self, mode, ids, original_labels):
+        #        ids = ids[:300]
+        #        original_labels = original_labels[:300]
         assert len(ids) == len(original_labels)
         images = []
         # 2 mean sites
@@ -85,9 +87,73 @@ class CellularImageDataset(Dataset):
             p.close()
             p.join()
             gc.collect()
-        images = np.array(images)
+        images = list(chain.from_iterable(images))
+        # images = np.array(images)
 
         return images, labels
+
+
+class CellularImageDatasetV2(Dataset):
+    def __init__(self, mode, ids, augment,
+                 visualize=False, logger=None):
+        '''
+        ids : id_code
+        '''
+        self.mode = mode
+        self.visualize = visualize
+        self.logger = logger
+
+        if mode == "test":
+            labels = [0] * len(ids)
+        else:  # train or valid
+            labels = pd.read_csv('./mnt/inputs/origin/train.csv.zip')\
+                .set_index('id_code').loc[ids]['sirna'].values
+        self.image_files, self.labels = self._parse_ids(mode, ids, labels)
+
+        # load validation
+        assert len(self.image_files) == len(self.labels)
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def __getitem__(self, idx):
+        img_files = self.image_files[idx]
+        img = self._load_one_img(img_files)
+        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # RGB
+
+        # img = self._augmentation(img)
+        img = img.transpose(2, 0, 1)  # (h, w, c) -> (c, h, w)
+
+        assert img.shape == (6, IMAGE_SIZE, IMAGE_SIZE)
+
+        return (torch.tensor(img), torch.tensor(self.labels[idx]))
+
+    def _parse_ids(self, mode, ids, original_labels):
+        # ids = ids[:300]
+        # original_labels = original_labels[:300]
+        assert len(ids) == len(original_labels)
+        # 2 mean sites
+        labels = list(chain.from_iterable(
+            [[label] * 2 for label in original_labels]))
+        image_files = []
+        for _id in ids:
+            split_id = _id.split('_')
+            filename_base = f'./mnt/inputs/{mode}/{split_id[0]}/' \
+                            f'Plate{split_id[1]}/{split_id[2]}'
+            for site in [1, 2]:
+                _image_files = []
+                for w in [1, 2, 3, 4, 5, 6]:
+                    _image_files.append(f'{filename_base}_s{site}_w{w}.png')
+                image_files.append(_image_files)
+        return image_files, labels
+
+    def _load_one_img(self, image_file_set):
+        _images = []
+        for image_file in image_file_set:
+            # 0 means gray scale
+            _images.append(cv2.imread(image_file, 0))
+        loaded_image = np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6)
+        return loaded_image
 
         #     def _augmentation(self, img):
         #         # -------
