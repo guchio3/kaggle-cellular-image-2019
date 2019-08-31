@@ -9,7 +9,9 @@ import numpy as np
 import pandas as pd
 # import rxrx.io as rio
 import torch
+from PIL import Image
 from torch.utils.data import Dataset
+from torchvision import transforms as T
 from tqdm import tqdm
 
 from .utils.logs import sel_log
@@ -143,7 +145,8 @@ class CellularImageDatasetV2(Dataset):
             for site in [1, 2]:
                 _image_files = []
                 for w in [1, 2, 3, 4, 5, 6]:
-                    _image_files.append(f'{filename_base}_s{site}_w{w}.png')
+                    # _image_files.append(f'{filename_base}_s{site}_w{w}.png')
+                    _image_files.append(f'{filename_base}_s{site}_w{w}.npy')
                 image_files.append(_image_files)
         return image_files, labels
 
@@ -151,7 +154,8 @@ class CellularImageDatasetV2(Dataset):
         _images = []
         for image_file in image_file_set:
             # 0 means gray scale
-            _images.append(cv2.imread(image_file, 0))
+            # _images.append(cv2.imread(image_file, 0))
+            _images.append(np.load(image_file))
         loaded_image = np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6)
         return loaded_image
 
@@ -235,3 +239,44 @@ class CellularImageDatasetV2(Dataset):
         #             img = _cutout(img)
         #
         #         return img
+
+
+class ImagesDS(Dataset):
+    def __init__(self, ids, img_dir, mode='train', channels=[1, 2, 3, 4, 5, 6]):
+        df = pd.read_csv(f'./mnt/inputs/origin/{mode}.csv').set_index('id_code')
+        df = df.loc[ids].reset_index()
+        df2 = df.copy()
+        df['site'] = 1
+        df2['site'] = 2
+        df = pd.concat([df, df2], axis=0)
+        self.records = df.to_records(index=False)
+        self.channels = channels
+#        self.site = site
+        self.mode = mode
+        self.img_dir = img_dir
+        self.len = df.shape[0]
+
+    @staticmethod
+    def _load_img_as_tensor(file_name):
+        with Image.open(file_name) as img:
+            return T.ToTensor()(img)
+
+    def _get_img_path(self, index, channel):
+        experiment = self.records[index].experiment
+        plate = self.records[index].plate
+        well = self.records[index].well
+        site = self.records[index].site
+        return '/'.join([self.img_dir, self.mode, experiment, f'Plate{plate}',
+                         f'{well}_s{site}_w{channel}.png'])
+
+    def __getitem__(self, index):
+        paths = [self._get_img_path(index, ch) for ch in self.channels]
+        img = torch.cat([self._load_img_as_tensor(img_path)
+                         for img_path in paths])
+        if self.mode == 'train':
+            return img, int(self.records[index].sirna)
+        else:
+            return img, self.records[index].id_code
+
+    def __len__(self):
+        return self.len

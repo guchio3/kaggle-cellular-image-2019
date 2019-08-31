@@ -1,8 +1,8 @@
 import datetime
+import gc
 import os
 import time
 from glob import glob
-from tqdm import tqdm
 
 import numpy as np
 import pandas as pd
@@ -12,11 +12,13 @@ import torch.optim as optim
 from sklearn.model_selection import GroupKFold as gkf
 from sklearn.model_selection import StratifiedKFold as skf
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
-from ..datasets import CellularImageDataset
+from ..datasets import CellularImageDataset, ImagesDS
 from ..models import resnet18
 from ..schedulers import pass_scheduler
 from ..utils.logs import sel_log, send_line_notification
+from ..utils.splittings import CellwiseStratifiedKFold as cskf
 
 
 class Runner(object):
@@ -60,7 +62,8 @@ class Runner(object):
             model = resnet18.Network(pretrained, 1108)
         else:
             raise Exception(f'invalid model_type: {model_type}')
-        return torch.nn.DataParallel(model.to(self.device))
+        # return torch.nn.DataParallel(model.to(self.device))
+        return model.to(self.device)
 
     def _get_optimizer(self, optim_type, lr, model):
         if optim_type == 'sgd':
@@ -135,6 +138,7 @@ class Runner(object):
 
     def _build_loader(self, mode, ids, augment):
         dataset = CellularImageDataset(mode, ids, augment)
+        # dataset = ImagesDS(ids, './mnt/inputs/', mode)
         sampler = self._get_sampler(dataset, mode, self.sampler_type)
         drop_last = True if mode == 'train' else False
         loader = DataLoader(
@@ -179,6 +183,8 @@ class Runner(object):
             running_loss += train_loss.item()
 
         train_loss = running_loss / len(loader)
+        images.to('cpu')
+        labels.to('cpu')
 
         return train_loss
 
@@ -207,6 +213,8 @@ class Runner(object):
         valid_accuracy = self._calc_accuracy(
             valid_preds, valid_labels
         )
+        images.to('cpu')
+        labels.to('cpu')
 
         return valid_loss, valid_accuracy
 
@@ -283,6 +291,13 @@ class Runner(object):
         elif split_type == 'skf':
             fold = skf(split_num, shuffle=True, random_state=71)\
                 .split(trn_df['id_code'], trn_df['sirna'])
+        elif split_type == 'cskf':
+            fold = cskf(
+                trn_df,
+                trn_df['sirna'],
+                split_num,
+                shuffle=True,
+                random_state=71)
         else:
             raise Exception(f'invalid split type: {split_type}')
         for trn_idx, val_idx in fold:
@@ -298,7 +313,8 @@ class Runner(object):
 
     def _warmup_setting(self, epoch):
         if epoch == 1:
-            for name, child in self.model.module.named_children():
+            for name, child in self.model.named_children():
+                # for name, child in self.model.module.named_children():
                 if name == 'fc':
                     sel_log(name + ' is unfrozen', self.logger)
                     for param in child.parameters():
@@ -361,6 +377,8 @@ class Runner(object):
             self._save_checkpoint(current_epoch, valid_loss, valid_acc)
 
         self.trn_time = int(time.time() - epoch_start_time) // 60
+        del train_loader, valid_loader
+        gc.collect()
 
     def make_submission_file(self):
         tst_ids = self._get_test_ids()
