@@ -1,8 +1,8 @@
-description: for debug
+description: small batchsize
 runner: r001
 device: cuda
 batch_size: 48
-max_epoch: 1
+max_epoch: 30
 fobj: ce
 model:
     model_type: resnet18

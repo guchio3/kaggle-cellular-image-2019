@@ -34,6 +34,10 @@ def parse_args(logger=None):
                         help='whether or not to use debug mode',
                         action='store_true',
                         default=False)
+    parser.add_argument('-p', '--prediction',
+                        help='flag which specifies prediction mode',
+                        action='store_true',
+                        default=False)
     args = parser.parse_args()
     sel_log(f'args: {sorted(vars(args).items())}', logger)
     return args
