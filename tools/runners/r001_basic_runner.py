@@ -342,7 +342,6 @@ class Runner(object):
     # -------
 
     def train_model(self):
-        # TODO
         trn_ids, val_ids = self._trn_val_split(self.split_type, self.split_num)
         if self.debug:
             trn_ids = trn_ids[:300]
