@@ -12,6 +12,7 @@ import torch.optim as optim
 from sklearn.model_selection import GroupKFold as gkf
 from sklearn.model_selection import StratifiedKFold as skf
 from torch.utils.data import DataLoader
+from torch.nn.functional import softmax
 from tqdm import tqdm
 
 from ..datasets import CellularImageDataset, ImagesDS
@@ -236,11 +237,12 @@ class Runner(object):
                     self.device, dtype=torch.float), labels.to(
                     self.device)
                 outputs = self.model.forward(images)
+                sm_outputs = softmax(outputs, dim=1)
                 # avg predictions
                 # outputs = torch.mean(outputs.reshape((-1, 1108, 2)), 2)
-                outputs = torch.mean(torch.stack(
-                    [outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
-                _, predicted = torch.max(outputs.data, 1)
+                sm_outputs = torch.mean(torch.stack(
+                    [sm_outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
+                _, predicted = torch.max(sm_outputs.data, 1)
 
                 test_ids.append(ids[::2])
                 test_preds.append(predicted.cpu())
