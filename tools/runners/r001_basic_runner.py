@@ -402,7 +402,7 @@ class Runner(object):
         submission_df = pd.read_csv(
             './mnt/inputs/origin/sample_submission.csv')
         submission_df = submission_df.set_index('id_code')
-        submission_df.loc[test_ids]['sirna'] = test_preds
+        submission_df.loc[test_ids, 'sirna'] = test_preds
         submission_df = submission_df.reset_index()
         filename_base = f'{self.exp_id}_{self.exp_time}_' \
             f'{best_loss:.5f}_{best_acc:.5f}'

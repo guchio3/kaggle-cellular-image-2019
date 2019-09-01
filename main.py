@@ -24,7 +24,7 @@ if __name__ == '__main__':
     if configs['runner'] == 'r001':
         from tools.runners.r001_basic_runner import Runner
     runner = Runner(configs, args, logger)
-    runner.train_model()
+    # runner.train_model()
     runner.make_submission_file()
 
     prec_time = time.time() - t0
