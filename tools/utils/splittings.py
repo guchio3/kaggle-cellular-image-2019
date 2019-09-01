@@ -17,8 +17,12 @@ def CellwiseStratifiedKFold(
         X_df, y, n_splits=5, shuffle=False, random_state=71):
     cells = X_df.experiment.apply(lambda x: x.split('-')[0])
     cell_folds = []
+    whole_index = np.array([i for i in range(len(X_df))])
+    cell_whole_indexes = []
     for cell in np.unique(cells):
         cell_df = X_df[cells == cell]
+        cell_whole_index = whole_index[cells == cell]
+        cell_whole_indexes.append(cell_whole_index)
         cell_y = y[cells == cell]
         if cell_y.value_counts().min() < n_splits:
             cell_fold = skf(
@@ -37,12 +41,12 @@ def CellwiseStratifiedKFold(
         cell_folds.append(cell_fold)
 
     fold = [[[], []] for i in range(n_splits)]
-    for cell_fold in cell_folds:
+    for cell_whole_index, cell_fold in zip(cell_whole_indexes, cell_folds):
         for i, (trn_idx, val_idx) in enumerate(cell_fold):
             if i > 2:
                 break
-            fold[i][0].append(trn_idx)
-            fold[i][1].append(val_idx)
+            fold[i][0].append(cell_whole_index[trn_idx])
+            fold[i][1].append(cell_whole_index[val_idx])
     for i, _ in enumerate(fold):
         if len(fold[i][0]) > 0:
             fold[i][0] = np.concatenate(fold[i][0])
