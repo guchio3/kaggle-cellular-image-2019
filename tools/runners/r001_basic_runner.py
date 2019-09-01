@@ -154,7 +154,7 @@ class Runner(object):
             worker_init_fn=lambda x: np.random.seed(),
             drop_last=drop_last,
             pin_memory=True,
-#            shuffle=shuffle,
+            #            shuffle=shuffle,
         )
         return loader
 
@@ -229,6 +229,7 @@ class Runner(object):
         test_preds = []
 
         sel_log('predicting ...', self.logger)
+        AUGNUM = 2
         with torch.no_grad():
             for (ids, images, labels) in tqdm(loader):
                 images, labels = images.to(
@@ -236,7 +237,9 @@ class Runner(object):
                     self.device)
                 outputs = self.model.forward(images)
                 # avg predictions
-                outputs = torch.mean(outputs.reshape((-1, 1108, 2)), 2)
+                # outputs = torch.mean(outputs.reshape((-1, 1108, 2)), 2)
+                outputs = torch.mean(torch.stack(
+                    [outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
                 _, predicted = torch.max(outputs.data, 1)
 
                 test_ids.append(ids[::2])
@@ -281,7 +284,7 @@ class Runner(object):
             temp_loss = float(split_filename[2])
             temp_acc = float(split_filename[3])
             if temp_loss < best_loss:
-            # if temp_acc > best_acc:
+                # if temp_acc > best_acc:
                 best_loss = temp_loss
                 best_acc = temp_acc
                 best_filename = filename
