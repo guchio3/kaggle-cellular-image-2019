@@ -243,7 +243,7 @@ class Runner(object):
                 test_preds.append(predicted.cpu())
 
             test_ids = np.concatenate(test_ids)
-            test_preds = torch.cat(test_preds)
+            test_preds = torch.cat(test_preds).numpy()
 
         return test_ids, test_preds
 
