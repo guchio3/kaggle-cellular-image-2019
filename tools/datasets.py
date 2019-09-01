@@ -27,15 +27,17 @@ def _load_imgs_from_ids(id_pair, mode):
     split_id = _id.split('_')
     filename_base = f'./mnt/inputs/{mode}/{split_id[0]}/' \
                     f'Plate{split_id[1]}/{split_id[2]}'
+    res_id_pairs = []
     for site in [1, 2]:
         _images = []
         for w in [1, 2, 3, 4, 5, 6]:
             # 0 means gray scale
             _images.append(
                 cv2.imread(f'{filename_base}_s{site}_w{w}.png', 0))
-        images.append(
-            np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6))
-    return images
+#        images.append(
+#            np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6))
+        res_id_pairs.append([_id, np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6), label])
+    return res_id_pairs
 
 
 class CellularImageDataset(Dataset):
@@ -53,7 +55,7 @@ class CellularImageDataset(Dataset):
         else:  # train or valid
             labels = pd.read_csv('./mnt/inputs/origin/train.csv.zip')\
                 .set_index('id_code').loc[ids]['sirna'].values
-        self.images, self.labels = self._parse_ids(mode, ids, labels)
+        self.ids, self.images, self.labels = self._parse_ids(mode, ids, labels)
 
         # load validation
         assert len(self.images) == len(self.labels)
@@ -70,7 +72,7 @@ class CellularImageDataset(Dataset):
 
         assert img.shape == (6, IMAGE_SIZE, IMAGE_SIZE)
 
-        return (torch.tensor(img), torch.tensor(self.labels[idx]))
+        return (self.ids[idx], torch.tensor(img), torch.tensor(self.labels[idx]))
 
     def _parse_ids(self, mode, ids, original_labels):
         #        ids = ids[:300]
@@ -85,14 +87,19 @@ class CellularImageDataset(Dataset):
             # self だとエラー
             iter_func = partial(_load_imgs_from_ids, mode=mode)
             imap = p.imap_unordered(iter_func, list(zip(ids, original_labels)))
-            images = list(tqdm(imap, total=len(ids)))
+            res_id_pairs = list(tqdm(imap, total=len(ids)))
             p.close()
             p.join()
             gc.collect()
-        images = list(chain.from_iterable(images))
-        # images = np.array(images)
+        res_id_pairs = list(chain.from_iterable(res_id_pairs))
 
-        return images, labels
+        ids, images, labels = [], [], []
+        for res_id_pair in res_id_pairs:
+            ids.append(res_id_pair[0])
+            images.append(res_id_pair[1])
+            labels.append(res_id_pair[2])
+
+        return ids, images, labels
 
 
 class CellularImageDatasetV2(Dataset):

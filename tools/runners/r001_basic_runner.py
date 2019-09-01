@@ -62,8 +62,8 @@ class Runner(object):
             model = resnet18.Network(pretrained, 1108)
         else:
             raise Exception(f'invalid model_type: {model_type}')
-        # return torch.nn.DataParallel(model.to(self.device))
-        return model.to(self.device)
+        # return model.to(self.device)
+        return torch.nn.DataParallel(model.to(self.device))
 
     def _get_optimizer(self, optim_type, lr, model):
         if optim_type == 'sgd':
@@ -136,20 +136,25 @@ class Runner(object):
             # data_source=dataset.image_files)
         return sampler
 
-    def _build_loader(self, mode, ids, augment):
+    def _build_loader(self, mode, ids, augment, batch_size=None):
         dataset = CellularImageDataset(mode, ids, augment)
         # dataset = ImagesDS(ids, './mnt/inputs/', mode)
         sampler = self._get_sampler(dataset, mode, self.sampler_type)
         drop_last = True if mode == 'train' else False
+#        shuffle = True if mode == 'train' else False
+        if not batch_size:
+            # specify for evaluation
+            batch_size = self.batch_size
         loader = DataLoader(
             dataset,
-            batch_size=self.batch_size,
+            batch_size=batch_size,
             sampler=sampler,
             # num_workers=cpu_count(),
             num_workers=0,
             worker_init_fn=lambda x: np.random.seed(),
             drop_last=drop_last,
             pin_memory=True,
+#            shuffle=shuffle,
         )
         return loader
 
@@ -166,7 +171,7 @@ class Runner(object):
         self.model.train()
         running_loss = 0
 
-        for (images, labels) in tqdm(loader):
+        for (ids, images, labels) in tqdm(loader):
             images, labels = images.to(
                 self.device, dtype=torch.float), labels.to(
                 self.device)
@@ -183,8 +188,8 @@ class Runner(object):
             running_loss += train_loss.item()
 
         train_loss = running_loss / len(loader)
-        images.to('cpu')
-        labels.to('cpu')
+#        images.detach()
+#        labels.detach()
 
         return train_loss
 
@@ -192,52 +197,55 @@ class Runner(object):
         self.model.eval()
         running_loss = 0
 
-        valid_preds, valid_labels = [], []
-        for (images, labels) in tqdm(loader):
-            images, labels = images.to(
-                self.device, dtype=torch.float), labels.to(
-                self.device)
-            outputs = self.model.forward(images)
-            valid_loss = self.fobj(outputs, labels)
-            running_loss += valid_loss.item()
+        with torch.no_grad():
+            valid_preds, valid_labels = [], []
+            for (ids, images, labels) in tqdm(loader):
+                images, labels = images.to(
+                    self.device, dtype=torch.float), labels.to(
+                    self.device)
+                outputs = self.model.forward(images)
+                valid_loss = self.fobj(outputs, labels)
+                running_loss += valid_loss.item()
 
-            _, predicted = torch.max(outputs.data, 1)
+                _, predicted = torch.max(outputs.data, 1)
 
-            valid_preds.append(predicted.cpu())
-            valid_labels.append(labels.cpu())
+                valid_preds.append(predicted.cpu())
+                valid_labels.append(labels.cpu())
 
-        valid_loss = running_loss / len(loader)
+            valid_loss = running_loss / len(loader)
 
-        valid_preds = torch.cat(valid_preds)
-        valid_labels = torch.cat(valid_labels)
-        valid_accuracy = self._calc_accuracy(
-            valid_preds, valid_labels
-        )
-        images.to('cpu')
-        labels.to('cpu')
+            valid_preds = torch.cat(valid_preds)
+            valid_labels = torch.cat(valid_labels)
+            valid_accuracy = self._calc_accuracy(
+                valid_preds, valid_labels
+            )
 
         return valid_loss, valid_accuracy
 
     def _test_loop(self, loader):
         self.model.eval()
 
+        test_ids = []
         test_preds = []
 
         sel_log('predicting ...', self.logger)
-        for (images, labels) in tqdm(loader):
-            images, labels = images.to(
-                self.device, dtype=torch.float), labels.to(
-                self.device)
-            outputs = self.model.forward(images)
-            # avg predictions
-            outputs = torch.mean(outputs.reshape((-1, 1108, 2)), 2)
-            _, predicted = torch.max(outputs.data, 1)
+        with torch.no_grad():
+            for (ids, images, labels) in tqdm(loader):
+                images, labels = images.to(
+                    self.device, dtype=torch.float), labels.to(
+                    self.device)
+                outputs = self.model.forward(images)
+                # avg predictions
+                outputs = torch.mean(outputs.reshape((-1, 1108, 2)), 2)
+                _, predicted = torch.max(outputs.data, 1)
 
-            test_preds.append(predicted.cpu())
+                test_ids.append(ids[::2])
+                test_preds.append(predicted.cpu())
 
-        test_preds = torch.cat(test_preds)
+            test_ids = np.concatenate(test_ids)
+            test_preds = torch.cat(test_preds)
 
-        return test_preds
+        return test_ids, test_preds
 
     def _load_checkpoint(self, cp_filename):
         checkpoint = torch.load(cp_filename)
@@ -272,7 +280,8 @@ class Runner(object):
             split_filename = filename.split('/')[-1].split('_')
             temp_loss = float(split_filename[2])
             temp_acc = float(split_filename[3])
-            if temp_acc > best_acc:
+            if temp_loss < best_loss:
+            # if temp_acc > best_acc:
                 best_loss = temp_loss
                 best_acc = temp_acc
                 best_filename = filename
@@ -280,6 +289,7 @@ class Runner(object):
 
     def _load_best_model(self):
         best_cp_filename, best_loss, best_acc = self._search_best_filename()
+        sel_log(f'the best file is {best_cp_filename} !', self.logger)
         _ = self._load_checkpoint(best_cp_filename)
         return best_loss, best_acc
 
@@ -313,8 +323,8 @@ class Runner(object):
 
     def _warmup_setting(self, epoch):
         if epoch == 1:
-            for name, child in self.model.named_children():
-                # for name, child in self.model.module.named_children():
+            # for name, child in self.model.named_children():
+            for name, child in self.model.module.named_children():
                 if name == 'fc':
                     sel_log(name + ' is unfrozen', self.logger)
                     for param in child.parameters():
@@ -387,11 +397,13 @@ class Runner(object):
         test_loader = self._build_loader(
             mode="test", ids=tst_ids, augment=None)
         best_loss, best_acc = self._load_best_model()
-        test_preds = self._test_loop(test_loader)
+        test_ids, test_preds = self._test_loop(test_loader)
 
         submission_df = pd.read_csv(
             './mnt/inputs/origin/sample_submission.csv')
-        submission_df['sirna'] = test_preds
+        submission_df = submission_df.set_index('id_code')
+        submission_df.loc[test_ids]['sirna'] = test_preds
+        submission_df = submission_df.reset_index()
         filename_base = f'{self.exp_id}_{self.exp_time}_' \
             f'{best_loss:.5f}_{best_acc:.5f}'
         sub_filename = f'./mnt/submissions/{filename_base}_sub.csv'

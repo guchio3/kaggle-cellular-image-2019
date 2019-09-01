@@ -1,8 +1,8 @@
-description: cskf w/ 96 batch
+description: cskf w/ bs 96, for evaluating pipeline
 runner: r001
 device: cuda
-batch_size: 96
-max_epoch: 30
+batch_size: 96 
+max_epoch: 20
 fobj: ce
 model:
     model_type: resnet18
