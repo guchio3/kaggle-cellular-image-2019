@@ -17,7 +17,7 @@ from torch.nn.functional import softmax
 from tqdm import tqdm
 
 from ..datasets import CellularImageDataset, ImagesDS
-from ..models import resnet18
+from ..models import resnet18, efficientnetb7
 from ..schedulers import pass_scheduler
 from ..utils.logs import sel_log, send_line_notification
 from ..utils.splittings import CellwiseStratifiedKFold as cskf
@@ -65,6 +65,8 @@ class Runner(object):
     def _get_model(self, model_type, pretrained):
         if model_type == 'resnet18':
             model = resnet18.Network(pretrained, 1108)
+        elif model_type == 'efficientnetb7':
+            model = efficientnetb7.Network(pretrained, 1108)
         else:
             raise Exception(f'invalid model_type: {model_type}')
         # return model.to(self.device)
@@ -331,10 +333,10 @@ class Runner(object):
         return tst_ids
 
     def _warmup_setting(self, epoch):
-        if epoch == 1:
+        if epoch == 2:
             # for name, child in self.model.named_children():
             for name, child in self.model.module.named_children():
-                if name == 'fc' or '0' in name:
+                if 'fc' in name:
                     sel_log(name + ' is unfrozen', self.logger)
                     for param in child.parameters():
                         param.requires_grad = True
