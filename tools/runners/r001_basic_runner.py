@@ -17,7 +17,7 @@ from torch.nn.functional import softmax
 from tqdm import tqdm
 
 from ..datasets import CellularImageDataset, ImagesDS
-from ..models import resnet18, efficientnetb7
+from ..models import resnet18, efficientnetb4, efficientnetb5, efficientnetb7
 from ..schedulers import pass_scheduler
 from ..utils.logs import sel_log, send_line_notification
 from ..utils.splittings import CellwiseStratifiedKFold as cskf
@@ -65,6 +65,10 @@ class Runner(object):
     def _get_model(self, model_type, pretrained):
         if model_type == 'resnet18':
             model = resnet18.Network(pretrained, 1108)
+        elif model_type == 'efficientnetb4':
+            model = efficientnetb4.Network(pretrained, 1108)
+        elif model_type == 'efficientnetb5':
+            model = efficientnetb5.Network(pretrained, 1108)
         elif model_type == 'efficientnetb7':
             model = efficientnetb7.Network(pretrained, 1108)
         else:

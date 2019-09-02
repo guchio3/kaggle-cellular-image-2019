@@ -1,11 +1,11 @@
-description: efficient net
+description: efficient net b5
 runner: r001
 device: cuda
-batch_size: 8
+batch_size: 32
 max_epoch: 30
 fobj: ce
 model:
-    model_type: efficientnetb7
+    model_type: efficientnetb4
     pretrained: true
 optimizer: 
     optim_type: adam
