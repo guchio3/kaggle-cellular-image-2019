@@ -330,7 +330,7 @@ class Runner(object):
         if epoch == 1:
             # for name, child in self.model.named_children():
             for name, child in self.model.module.named_children():
-                if name == 'fc':
+                if name == 'fc' or '0' in name:
                     sel_log(name + ' is unfrozen', self.logger)
                     for param in child.parameters():
                         param.requires_grad = True
