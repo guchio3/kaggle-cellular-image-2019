@@ -1,9 +1,9 @@
 import datetime
 import gc
 import os
+import random
 import time
 from glob import glob
-import random
 
 import numpy as np
 import pandas as pd
@@ -12,12 +12,13 @@ import torch.nn as nn
 import torch.optim as optim
 from sklearn.model_selection import GroupKFold as gkf
 from sklearn.model_selection import StratifiedKFold as skf
-from torch.utils.data import DataLoader
 from torch.nn.functional import softmax
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from ..datasets import CellularImageDataset, ImagesDS
-from ..models import resnet18, efficientnetb4, efficientnetb5, efficientnetb7
+from ..models import (efficientnetb2, efficientnetb4, efficientnetb5,
+                      efficientnetb7, resnet18)
 from ..schedulers import pass_scheduler
 from ..utils.logs import sel_log, send_line_notification
 from ..utils.splittings import CellwiseStratifiedKFold as cskf
@@ -65,6 +66,8 @@ class Runner(object):
     def _get_model(self, model_type, pretrained):
         if model_type == 'resnet18':
             model = resnet18.Network(pretrained, 1108)
+        elif model_type == 'efficientnetb2':
+            model = efficientnetb2.Network(pretrained, 1108)
         elif model_type == 'efficientnetb4':
             model = efficientnetb4.Network(pretrained, 1108)
         elif model_type == 'efficientnetb5':
@@ -247,12 +250,15 @@ class Runner(object):
                     self.device, dtype=torch.float), labels.to(
                     self.device)
                 outputs = self.model.forward(images)
-                sm_outputs = softmax(outputs, dim=1)
                 # avg predictions
                 # outputs = torch.mean(outputs.reshape((-1, 1108, 2)), 2)
-                sm_outputs = torch.mean(torch.stack(
-                    [sm_outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
-                _, predicted = torch.max(sm_outputs.data, 1)
+                outputs = torch.mean(torch.stack(
+                    [outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
+                _, predicted = torch.max(outputs.data, 1)
+                # sm_outputs = softmax(outputs, dim=1)
+                # sm_outputs = torch.mean(torch.stack(
+                #     [sm_outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
+                # _, predicted = torch.max(sm_outputs.data, 1)
 
                 test_ids.append(ids[::2])
                 test_preds.append(predicted.cpu())
