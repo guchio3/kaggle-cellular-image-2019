@@ -10,9 +10,9 @@ class Network(nn.Module):
         # [https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py]
         model = torchvision.models.resnet18(pretrained=pretrained)
 
-        # self.conv0 = nn.Conv2d(6, 3, kernel_size=3, stride=1, padding=1)
-        # self.bn0 = nn.BatchNorm2d(3)
-        # self.conv1 = model.conv1
+#        self.conv0 = nn.Conv2d(6, 3, kernel_size=3, stride=1, padding=1)
+#        self.bn0 = nn.BatchNorm2d(3)
+#        self.conv1 = model.conv1
         new_conv = nn.Conv2d(
             6,
             64,
