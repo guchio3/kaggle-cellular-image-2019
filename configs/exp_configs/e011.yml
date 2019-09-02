@@ -1,0 +1,19 @@
+description: efficient net b4 w/ lower lr
+runner: r001
+device: cuda
+batch_size: 16
+max_epoch: 30
+fobj: ce
+model:
+    model_type: efficientnetb4
+    pretrained: true
+optimizer: 
+    optim_type: adam
+    lr: 0.0001
+scheduler:
+    scheduler_type: pass
+sampler:
+    sampler_type: random
+split: 
+    split_type: cskf
+    split_num: 5
