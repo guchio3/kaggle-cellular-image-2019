@@ -337,7 +337,7 @@ class Runner(object):
         return tst_ids
 
     def _warmup_setting(self, epoch):
-        if epoch == 2:
+        if epoch == 1:
             # for name, child in self.model.named_children():
             for name, child in self.model.module.named_children():
                 if 'fc' in name:
