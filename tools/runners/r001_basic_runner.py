@@ -3,6 +3,7 @@ import gc
 import os
 import time
 from glob import glob
+import random
 
 import numpy as np
 import pandas as pd
@@ -20,6 +21,9 @@ from ..models import resnet18
 from ..schedulers import pass_scheduler
 from ..utils.logs import sel_log, send_line_notification
 from ..utils.splittings import CellwiseStratifiedKFold as cskf
+
+random.seed(71)
+torch.manual_seed(71)
 
 
 class Runner(object):
