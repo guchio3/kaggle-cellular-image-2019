@@ -19,7 +19,7 @@ from tqdm import tqdm
 from ..datasets import CellularImageDataset, ImagesDS
 from ..models import (efficientnetb2, efficientnetb4, efficientnetb5,
                       efficientnetb7, resnet18)
-from ..schedulers import pass_scheduler
+from ..schedulers import pass_scheduler, CosineAnnealingWarmUpRestarts as cawur
 from ..utils.logs import sel_log, send_line_notification
 from ..utils.splittings import CellwiseStratifiedKFold as cskf
 
@@ -126,6 +126,10 @@ class Runner(object):
             #     [http://katsura-jp.hatenablog.com/entry/2019/01/30/183501]
             # if you want to use cosine annealing, use below scheduler.
             scheduler = optim.lr_scheduler.CosineAnnealingLR(
+                self.optimizer, T_max=max_epoch, eta_min=0.00001
+            )
+        elif scheduler_type == 'cawur':
+            scheduler = cawur(
                 self.optimizer, T_max=max_epoch, eta_min=0.0001
             )
         else:
