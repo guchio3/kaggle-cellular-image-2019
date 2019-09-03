@@ -26,6 +26,7 @@ from ..utils.splittings import CellwiseStratifiedKFold as cskf
 
 random.seed(71)
 torch.manual_seed(71)
+torch.backends.cudnn.deterministic = True
 
 
 class Runner(object):
