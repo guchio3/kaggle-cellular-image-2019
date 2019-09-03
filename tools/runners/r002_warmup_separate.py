@@ -137,10 +137,10 @@ class Runner(object):
         elif scheduler_type == 'cawur':
             scheduler = cawur(
                 optimizer,
-                T_0=5,
+                T_0=10,
                 T_mult=1,
                 eta_max=optimizer.defaults['lr'],
-                T_up=1,
+                T_up=2,
                 gamma=0.5
             )
         else:
@@ -426,6 +426,7 @@ class Runner(object):
             else:
                 optimizer.load_state_dict(checkpoint['optim_state_dict'])
                 scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+                warmup_loop_start = self.warmup_max_epoch
                 main_loop_start = current_epoch
         else:
             warmup = True
