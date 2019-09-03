@@ -1,0 +1,23 @@
+description: efficient net b2 baseline
+runner: r002
+device: cuda
+batch_size: 32
+warmup_max_epoch: 5
+max_epoch: 30
+fobj: ce
+model:
+    model_type: efficientnetb2
+    pretrained: true
+optimizer: 
+    warmup_optim_type: adam
+    warmup_lr: 0.001
+    optim_type: adam
+    lr: 0.0001
+scheduler:
+    scheduler_type: cosine
+    warmup_scheduler_type: cosine
+sampler:
+    sampler_type: random
+split: 
+    split_type: cskf
+    split_num: 5
