@@ -446,7 +446,7 @@ class Runner(object):
                 + f'train loss: {train_loss:.5f} / '
                 + f'valid loss: {valid_loss:.5f} / '
                 + f'valid acc: {valid_acc:.5f} / '
-                + f'lr: {warmup_optimizer.param_groups[0]["lr"]:.5f} / '
+                + f'lr: {warmup_optimizer.param_groups[0]["lr"]:.6f} / '
                 + f'time: {int(time.time()-start_time)}sec', self.logger)
 
             self.histories['train_loss'].append(train_loss)
@@ -478,7 +478,7 @@ class Runner(object):
                 + f'train loss: {train_loss:.5f} / '
                 + f'valid loss: {valid_loss:.5f} / '
                 + f'valid acc: {valid_acc:.5f} / '
-                + f'lr: {optimizer.param_groups[0]["lr"]:.5f} / '
+                + f'lr: {optimizer.param_groups[0]["lr"]:.6f} / '
                 + f'time: {int(time.time()-start_time)}sec', self.logger)
 
             self.histories['train_loss'].append(train_loss)
