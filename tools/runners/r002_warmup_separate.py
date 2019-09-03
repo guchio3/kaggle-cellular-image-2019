@@ -284,8 +284,6 @@ class Runner(object):
     def _load_checkpoint(self, cp_filename):
         checkpoint = torch.load(cp_filename)
         self.model.load_state_dict(checkpoint['model_state_dict'])
-#        self.optimizer.load_state_dict(checkpoint['optim_state_dict'])
-#        self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         self.histories = checkpoint['histories']
         return checkpoint
 
@@ -469,6 +467,8 @@ class Runner(object):
         iter_epochs = range(main_loop_start + 1, self.max_epoch + 1, 1)
         sel_log('start trainging !', self.logger)
         for current_epoch in iter_epochs:
+            # scheduler.step()
+            print(f'lr: {optimizer.param_groups[0]["lr"]}')
             start_time = time.time()
             train_loss = self._train_loop(train_loader, optimizer)
             valid_loss, valid_acc = self._valid_loop(valid_loader)
