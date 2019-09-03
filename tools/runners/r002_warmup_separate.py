@@ -433,7 +433,7 @@ class Runner(object):
         # run warmup training loop
         epoch_start_time = time.time()
         self._warmup_setting(warmup=warmup)
-        warmup_iter_epochs = range(warmup_loop_start + 1, self.max_epoch + 1, 1)
+        warmup_iter_epochs = range(warmup_loop_start + 1, self.warmup_max_epoch + 1, 1)
         sel_log('start warmup trainging !', self.logger)
         for current_epoch in warmup_iter_epochs:
             start_time = time.time()
@@ -446,7 +446,7 @@ class Runner(object):
                 + f'train loss: {train_loss:.5f} / '
                 + f'valid loss: {valid_loss:.5f} / '
                 + f'valid acc: {valid_acc:.5f} / '
-                + f'lr: {optimizer.param_groups[0]["lr"]:.5f} / '
+                + f'lr: {warmup_optimizer.param_groups[0]["lr"]:.5f} / '
                 + f'time: {int(time.time()-start_time)}sec', self.logger)
 
             self.histories['train_loss'].append(train_loss)
