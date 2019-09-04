@@ -262,13 +262,13 @@ class Runner(object):
                 outputs = self.model.forward(images)
                 # avg predictions
                 # outputs = torch.mean(outputs.reshape((-1, 1108, 2)), 2)
-                outputs = torch.mean(torch.stack(
-                    [outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
-                _, predicted = torch.max(outputs.data, 1)
-                # sm_outputs = softmax(outputs, dim=1)
-                # sm_outputs = torch.mean(torch.stack(
-                #     [sm_outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
-                # _, predicted = torch.max(sm_outputs.data, 1)
+                # outputs = torch.mean(torch.stack(
+                #     [outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
+                # _, predicted = torch.max(outputs.data, 1)
+                sm_outputs = softmax(outputs, dim=1)
+                sm_outputs = torch.mean(torch.stack(
+                    [sm_outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
+                _, predicted = torch.max(sm_outputs.data, 1)
 
                 test_ids.append(ids[::2])
                 test_preds.append(predicted.cpu())
