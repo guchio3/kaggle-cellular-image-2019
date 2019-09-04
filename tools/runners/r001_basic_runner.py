@@ -85,7 +85,7 @@ class Runner(object):
                 model.parameters(),
                 lr=lr,
                 momentum=0.9,
-                weight_decay=1e-4,
+                # weight_decay=1e-4,
                 nesterov=True,
             )
         elif optim_type == 'adam':

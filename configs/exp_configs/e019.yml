@@ -8,7 +8,7 @@ model:
     model_type: efficientnetb2
     pretrained: true
 optimizer: 
-    optim_type: adam
+    optim_type: sgd
     lr: 0.01
 scheduler:
     scheduler_type: cosine
