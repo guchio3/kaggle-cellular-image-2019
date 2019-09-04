@@ -305,8 +305,8 @@ class Runner(object):
             split_filename = filename.split('/')[-1].split('_')
             temp_loss = float(split_filename[2])
             temp_acc = float(split_filename[3])
-            if temp_loss < best_loss:
-                # if temp_acc > best_acc:
+            # if temp_loss < best_loss:
+            if temp_acc > best_acc:
                 best_loss = temp_loss
                 best_acc = temp_acc
                 best_filename = filename
