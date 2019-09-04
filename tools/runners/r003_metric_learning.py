@@ -17,9 +17,10 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from ..datasets import CellularImageDataset, ImagesDS
-from ..models import (efficientnetb2, efficientnetb4, efficientnetb5,
-                      efficientnetb7, resnet18)
-from ..schedulers import pass_scheduler, CosineAnnealingWarmUpRestarts as cawur
+from ..models import (efficientnetb2, efficientnetb2_metric, efficientnetb4,
+                      efficientnetb5, efficientnetb7, resnet18)
+from ..schedulers import CosineAnnealingWarmUpRestarts as cawur
+from ..schedulers import pass_scheduler
 from ..utils.logs import sel_log, send_line_notification
 from ..utils.splittings import CellwiseStratifiedKFold as cskf
 
@@ -74,6 +75,8 @@ class Runner(object):
             model = efficientnetb5.Network(pretrained, 1108)
         elif model_type == 'efficientnetb7':
             model = efficientnetb7.Network(pretrained, 1108)
+        elif model_type == 'efficientnetb2_metric':
+            model = efficientnetb2_metric.Network(pretrained, 1108)
         else:
             raise Exception(f'invalid model_type: {model_type}')
         # return model.to(self.device)

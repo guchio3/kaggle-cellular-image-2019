@@ -26,7 +26,7 @@ class Network(nn.Module):
         if not pretrained:
             self._init_weight()
 
-    def forward(self, x):
+    def forward(self, x, label=None):
         out = self.model(x)
 #        x = self.conv1(x)
 #        x = self.bn1(x)

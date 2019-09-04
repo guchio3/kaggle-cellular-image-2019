@@ -39,7 +39,7 @@ class Network(nn.Module):
         if not pretrained:
             self._init_weight()
 
-    def forward(self, x):
+    def forward(self, x, label=None):
 #        x = self.conv0(x)
 #        x = self.bn0(x)
 #        x = self.relu(x)
