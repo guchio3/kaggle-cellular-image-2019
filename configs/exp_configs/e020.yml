@@ -9,7 +9,7 @@ model:
     pretrained: true
 optimizer: 
     optim_type: rmsprop
-    lr: 0.001
+    lr: 0.0003
 scheduler:
     scheduler_type: cosine
 sampler:
