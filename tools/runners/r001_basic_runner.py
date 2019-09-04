@@ -93,6 +93,12 @@ class Runner(object):
                 model.parameters(),
                 lr=lr,
             )
+        elif optim_type == 'rmsprop':
+            optimizer = optim.RMSprop(
+                model.parameters(),
+                lr=lr,
+                momentum=0.9,
+            )
         else:
             raise Exception(f'invalid optim_type: {optim_type}')
         return optimizer
