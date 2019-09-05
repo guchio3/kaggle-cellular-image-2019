@@ -50,6 +50,10 @@ class Runner(object):
         self.sampler_type = config['sampler']['sampler_type']
         self.split_type = config['split']['split_type']
         self.split_num = config['split']['split_num']
+        if 'augment' in config:
+            self.augment = config['augment']
+        else:
+            self.augment = []
         self.logger = logger
         self.histories = {
             'train_loss': [],
@@ -383,9 +387,9 @@ class Runner(object):
             val_ids = val_ids[:300]
 
         train_loader = self._build_loader(
-            mode="train", ids=trn_ids, augment=None)
+            mode="train", ids=trn_ids, augment=self.augment)
         valid_loader = self._build_loader(
-            mode="train", ids=val_ids, augment=None)
+            mode="train", ids=val_ids, augment=[])
 
         # load and apply checkpoint if needed
         if self.checkpoint:
@@ -429,7 +433,7 @@ class Runner(object):
         if self.debug:
             tst_ids = tst_ids[:300]
         test_loader = self._build_loader(
-            mode="test", ids=tst_ids, augment=None)
+            mode="test", ids=tst_ids, augment=[])
         best_loss, best_acc = self._load_best_model()
         test_ids, test_preds = self._test_loop(test_loader)
 
