@@ -203,6 +203,7 @@ class Runner(object):
                 self.device, dtype=torch.float), labels.to(
                 self.device)
 
+            # outputs = self.model.forward(images)
             outputs = self.model.forward(images, labels)
 
             train_loss = self.fobj(outputs, labels)
