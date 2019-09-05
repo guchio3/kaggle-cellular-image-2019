@@ -27,6 +27,7 @@ class Network(nn.Module):
         self.arc = ArcMarginProduct(
             in_features=self.model._fc.in_features,
             out_features=n_classes,
+            easy_margin=True,
         ).to('cuda')
 
         # weight initialization
