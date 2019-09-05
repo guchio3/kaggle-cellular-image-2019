@@ -203,7 +203,7 @@ class Runner(object):
                 self.device, dtype=torch.float), labels.to(
                 self.device)
 
-            outputs = self.model.forward(images)
+            outputs = self.model.forward(images, labels)
 
             train_loss = self.fobj(outputs, labels)
 
@@ -359,7 +359,7 @@ class Runner(object):
         if epoch == 1:
             # for name, child in self.model.named_children():
             for name, child in self.model.module.named_children():
-                if 'fc' in name:
+                if 'fc' in name or 'arc' in name:
                     sel_log(name + ' is unfrozen', self.logger)
                     for param in child.parameters():
                         param.requires_grad = True

@@ -25,6 +25,8 @@ if __name__ == '__main__':
         from tools.runners.r001_basic_runner import Runner
     elif configs['runner'] == 'r002':
         from tools.runners.r002_warmup_separate import Runner
+    elif configs['runner'] == 'r003':
+        from tools.runners.r003_metric_learning import Runner
     runner = Runner(configs, args, logger)
     if not args.prediction:
         runner.train_model()

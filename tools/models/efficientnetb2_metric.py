@@ -3,6 +3,7 @@ import torch.nn as nn
 from efficientnet_pytorch import EfficientNet
 
 from ..metrics import ArcMarginProduct
+from ..layers import myIdentity
 
 
 class Network(nn.Module):
@@ -22,11 +23,11 @@ class Network(nn.Module):
             new_conv.weight[:, :] = torch.stack(
                 [torch.mean(self.model._conv_stem.weight, 1)] * 6, dim=1)
         self.model._conv_stem = new_conv
-        self.model._fc = nn.Identity()
+        self.model._fc = myIdentity(in_features=self.model._fc.in_features)
         self.arc = ArcMarginProduct(
             in_features=self.model._fc.in_features,
             out_features=n_classes,
-        )
+        ).to('cuda')
 
         # weight initialization
         if not pretrained:
@@ -35,7 +36,7 @@ class Network(nn.Module):
     def forward(self, x, labels=None):
         if labels is None:
             with torch.no_grad():
-                labels = torch.zeros(x.size(), device='cuda')
+                labels = torch.zeros(x.shape[0], device='cuda')
         features = self.model(x)
         out = self.arc(features, labels)
         return out
@@ -43,6 +44,10 @@ class Network(nn.Module):
     def named_children(self):
         for name, module in self.model.named_children():
             yield name, module
+
+#    def to(self, device):
+#        super().to(device)
+#        self.arc.to(device)
 
     def _init_weight(self):
         for m in self.modules():
