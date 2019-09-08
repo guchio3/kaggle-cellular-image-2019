@@ -130,6 +130,8 @@ class CellularImageDataset(Dataset):
                     aug_list.append(HorizontalFlip(p=0.5))
                 if 'randomrotate90' in self.augment:
                     aug_list.append(RandomRotate90(p=0.5))
+                if 'rotate' in self.augment:
+                    aug_list.append(Rotate(p=0.5))
 
                 # if you want to use additional augmentation, add operations like below.
                 # albumentations: [https://github.com/albu/albumentations]
