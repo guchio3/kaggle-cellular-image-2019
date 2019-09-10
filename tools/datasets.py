@@ -4,19 +4,20 @@ from functools import partial
 from itertools import chain
 from multiprocessing import Pool
 
-import cv2
 import numpy as np
 import pandas as pd
 # import rxrx.io as rio
 import torch
-from albumentations import (Compose, HorizontalFlip, HueSaturationValue,
-                            Normalize, RandomBrightnessContrast,
-                            RandomRotate90, Resize, Rotate, ShiftScaleRotate,
-                            VerticalFlip)
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms as T
 from tqdm import tqdm
+
+import cv2
+from albumentations import (Compose, HorizontalFlip, HueSaturationValue,
+                            Normalize, RandomBrightnessContrast,
+                            RandomRotate90, Resize, Rotate, ShiftScaleRotate,
+                            VerticalFlip)
 
 from .utils.logs import sel_log
 
@@ -57,6 +58,7 @@ class CellularImageDataset(Dataset):
         self.visualize = visualize
         self.logger = logger
         self.augment = augment
+        self.len = None
 
         if mode == "test":
             labels = [0] * len(ids)
@@ -69,9 +71,14 @@ class CellularImageDataset(Dataset):
         assert len(self.images) == len(self.labels)
 
     def __len__(self):
-        return len(self.images)
+        if self.len:
+            return self.len
+        else:
+            return len(self.images)
 
     def __getitem__(self, idx):
+        if self.len:
+            idx = self.id_converter[idx]
         img = self.images[idx]
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # RGB
 
@@ -82,6 +89,15 @@ class CellularImageDataset(Dataset):
 
         return (self.ids[idx], torch.tensor(img),
                 torch.tensor(self.labels[idx]))
+
+    def reset_ids(self, ids):
+        self.len = len(ids)
+        self.id_converter = pd.Series(self.ids, name='id_name')\
+            .reset_index()\
+            .set_index('id_name')\
+            .loc[ids]\
+            .reset_index(drop=True)\
+            .to_dict()
 
     def _parse_ids(self, mode, ids, original_labels):
         #        ids = ids[:300]

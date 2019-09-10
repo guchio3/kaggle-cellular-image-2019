@@ -43,7 +43,7 @@ class Runner(object):
         self.batch_size = config['batch_size']
         self.max_epoch = config['max_epoch']
         self.fobj = self._get_fobj(config['fobj'])
-        self.model, self.optimizer = self._build_model(
+        self.models, self.optimizers = self._build_models( #################
             config['model'], config['optimizer'])
         self.scheduler = self._get_scheduler(
             config['scheduler']['scheduler_type'], self.max_epoch)
@@ -68,7 +68,7 @@ class Runner(object):
             raise Exception(f'invalid fobj_type: {fobj_type}')
         return fobj
 
-    def _get_model(self, model_type, pretrained):
+    def _get_models(self, model_type, pretrained):
         if model_type == 'resnet18':
             model = resnet18.Network(pretrained, 1108)
         elif model_type == 'efficientnetb2':
@@ -110,17 +110,17 @@ class Runner(object):
             raise Exception(f'invalid optim_type: {optim_type}')
         return optimizer
 
-    def _build_model(self, m_config, o_config):
-        model = self._get_model(
+    def _build_models(self, m_config, o_config):
+        models = self._get_models(
             m_config['model_type'],
             m_config['pretrained'],
         )
-        optimizer = self._get_optimizer(
+        optimizers = self._get_optimizers(
             o_config['optim_type'],
             o_config['lr'],
-            model,
+            models,
         )
-        return model, optimizer
+        return models, optimizers
 
     def _get_scheduler(self, scheduler_type, max_epoch):
         if scheduler_type == 'pass':
@@ -167,8 +167,9 @@ class Runner(object):
             # data_source=dataset.image_files)
         return sampler
 
-    def _build_loader(self, mode, ids, augment, batch_size=None):
-        dataset = CellularImageDataset(mode, ids, augment)
+    def _build_loader(self, mode, ids, augment, batch_size=None, dataset=None):
+        if dataset is None:
+            dataset = CellularImageDataset(mode, ids, augment)
         # dataset = ImagesDS(ids, './mnt/inputs/', mode)
         sampler = self._get_sampler(dataset, mode, self.sampler_type)
         drop_last = True if mode == 'train' else False
@@ -294,12 +295,12 @@ class Runner(object):
         self.histories = checkpoint['histories']
         return checkpoint
 
-    def _save_checkpoint(self, current_epoch, val_loss, val_acc, cell_type):
+    def _save_checkpoint(self, current_epoch, val_loss, val_acc):
         if not os.path.exists(f'./mnt/checkpoints/{self.exp_id}'):
             os.makedirs(f'./mnt/checkpoints/{self.exp_id}')
         # pth means pytorch
         cp_filename = f'./mnt/checkpoints/{self.exp_id}/' \
-            f'cell_type_{cell_type}_epoch_{current_epoch}_{val_loss:.5f}' \
+            f'epoch_{current_epoch}_{val_loss:.5f}' \
             f'_{val_acc:.5f}_checkpoint.pth'
         cp_dict = {
             'current_epoch': current_epoch,
@@ -311,13 +312,11 @@ class Runner(object):
         sel_log(f'now saving checkpoint to {cp_filename} ...', self.logger)
         torch.save(cp_dict, cp_filename)
 
-    def _search_best_filename(self, cell_type):
+    def _search_best_filename(self):
         best_loss = np.inf
         best_acc = -1
         best_filename = ''
         for filename in glob(f'./mnt/checkpoints/{self.exp_id}/*'):
-            if cell_type not in filename:
-                continue
             split_filename = filename.split('/')[-1].split('_')
             temp_loss = float(split_filename[2])
             temp_acc = float(split_filename[3])
@@ -328,19 +327,14 @@ class Runner(object):
                 best_filename = filename
         return best_filename, best_loss, best_acc
 
-    def _load_best_model(self, cell_type):
-        best_cp_filename, best_loss, best_acc = self._search_best_filename(cell_type)
+    def _load_best_model(self):
+        best_cp_filename, best_loss, best_acc = self._search_best_filename()
         sel_log(f'the best file is {best_cp_filename} !', self.logger)
         _ = self._load_checkpoint(best_cp_filename)
         return best_loss, best_acc
 
-    def _trn_val_split(self, split_type, split_num, cell_type):
+    def _trn_val_split(self, split_type, split_num):
         trn_df = pd.read_csv('./mnt/inputs/origin/train.csv.zip')
-        if cell_type not in ['ALL', 'HEPG2', 'U2OS', 'HUVEC', 'RPE']:
-            raise Exception(f'invalid cell type {cell_type}')
-        if cell_type != 'all':
-            trn_df = trn_df[trn_df.experiment.str.contains(cell_type)]
-
         if split_type == 'gkf':
             fold = gkf(split_num).split(
                 trn_df['id_code'], trn_df['sirna'], trn_df['well'])
@@ -362,12 +356,8 @@ class Runner(object):
             break
         return trn_ids, val_ids
 
-    def _get_test_ids(self, cell_type='ALL'):
+    def _get_test_ids(self, ):
         tst_df = pd.read_csv('./mnt/inputs/origin/test.csv')
-        if cell_type not in ['ALL', 'HEPG2', 'U2OS', 'HUVEC', 'RPE']:
-            raise Exception(f'invalid cell type {cell_type}')
-        if cell_type != 'all':
-            tst_df = tst_df[tst_df.experiment.str.contains(cell_type)]
         tst_ids = tst_df.id_code
         return tst_ids
 
@@ -391,80 +381,89 @@ class Runner(object):
 
     # -------
 
-    def train_model(self, cell_type='ALL'):
-        trn_ids, val_ids = self._trn_val_split(self.split_type, self.split_num, cell_type)
+    def train_model(self):
+        trn_ids, val_ids = self._trn_val_split(self.split_type, self.split_num)
         if self.debug:
-            trn_ids = trn_ids[:300]
-            val_ids = val_ids[:300]
+            trn_ids = trn_ids.sample(300, random_state=71)
+            val_ids = val_ids.sample(300, random_state=71)
 
-        train_loader = self._build_loader(
-            mode="train", ids=trn_ids, augment=self.augment)
-        valid_loader = self._build_loader(
-            mode="train", ids=val_ids, augment=[])
+        trn_dataset = CellularImageDataset('train', trn_ids, self.augment)
+        val_dataset = CellularImageDataset('train', val_ids, self.augment)
 
-        # load and apply checkpoint if needed
-        if self.checkpoint:
-            sel_log(f'loading checkpoint from {self.checkpoint} ...',
-                    self.logger)
-            checkpoint = self._load_checkpoint(self.checkpoint)
-            current_epoch = checkpoint['current_epoch']
-            iter_epochs = range(current_epoch + 1, self.max_epoch + 1, 1)
-        else:
-            iter_epochs = range(1, self.max_epoch + 1, 1)
+        for cell in ['']:
+            cell_trn_ids = 
+            cell_val_ids = 
+            trn_dataset.reset_ids(cell_trn_ids)
+            val_dataset.reset_ids(cell_val_ids)
 
-        epoch_start_time = time.time()
-        sel_log('start trainging !', self.logger)
-        for current_epoch in iter_epochs:
-            self._warmup_setting(current_epoch)
-            start_time = time.time()
-            train_loss = self._train_loop(train_loader)
-            valid_loss, valid_acc = self._valid_loop(valid_loader)
+            train_loader = self._build_loader(
+                mode="train", ids=trn_ids, augment=self.augment, trn_dataset)
+            valid_loader = self._build_loader(
+                mode="train", ids=val_ids, augment=[], val_dataset)
 
-            sel_log(
-                f'cell_type: {cell_type} / '
-                + f'epoch: {current_epoch} / '
-                + f'train loss: {train_loss:.5f} / '
-                + f'valid loss: {valid_loss:.5f} / '
-                + f'valid acc: {valid_acc:.5f} / '
-                + f'lr: {self.optimizer.param_groups[0]["lr"]:.5f} / '
-                + f'time: {int(time.time()-start_time)}sec', self.logger)
+            # load and apply checkpoint if needed
+            if self.checkpoint:
+                sel_log(f'loading checkpoint from {self.checkpoint} ...',
+                        self.logger)
+                checkpoint = self._load_checkpoint(self.checkpoint)
+                current_epoch = checkpoint['current_epoch']
+                iter_epochs = range(current_epoch + 1, self.max_epoch + 1, 1)
+            else:
+                iter_epochs = range(1, self.max_epoch + 1, 1)
 
-            self.histories['train_loss'].append(train_loss)
-            self.histories['valid_loss'].append(valid_loss)
-            self.histories['valid_acc'].append(valid_acc)
+            epoch_start_time = time.time()
+            sel_log('start trainging !', self.logger)
+            for current_epoch in iter_epochs:
+                self._warmup_setting(current_epoch)
+                start_time = time.time()
+                train_loss = self._train_loop(train_loader)
+                valid_loss, valid_acc = self._valid_loop(valid_loader)
 
-            self.scheduler.step()
-            self._save_checkpoint(current_epoch, valid_loss, valid_acc, cell_type)
+                sel_log(
+                    f'cell: {cell} / '
+                    + f'epoch: {current_epoch} / '
+                    + f'train loss: {train_loss:.5f} / '
+                    + f'valid loss: {valid_loss:.5f} / '
+                    + f'valid acc: {valid_acc:.5f} / '
+                    + f'lr: {self.optimizer.param_groups[0]["lr"]:.5f} / '
+                    + f'time: {int(time.time()-start_time)}sec', self.logger)
 
-        self.trn_time = int(time.time() - epoch_start_time) // 60
-        del train_loader, valid_loader
-        gc.collect()
+                self.histories['cell']['train_loss'].append(train_loss)
+                self.histories['cell']['valid_loss'].append(valid_loss)
+                self.histories['cell']['valid_acc'].append(valid_acc)
 
-    def make_submission_file(self, cell_type='ALL', sub_filename=None):
+                self.scheduler.step()
+                self._save_checkpoint(current_epoch, valid_loss, valid_acc)
+
+            self.trn_time = int(time.time() - epoch_start_time) // 60
+            del train_loader, valid_loader
+            gc.collect()
+
+    def make_submission_file(self):
         tst_ids = self._get_test_ids()
         if self.debug:
             tst_ids = tst_ids[:300]
         test_loader = self._build_loader(
             mode="test", ids=tst_ids, augment=[])
-        best_loss, best_acc = self._load_best_model(cell_type)
+        best_loss, best_acc = self._load_best_model()
         test_ids, test_preds = self._test_loop(test_loader)
 
-        if sub_filename:
-            submission_df = pd.read_csv(sub_filename)
-        else:
-            submission_df = pd.read_csv(
-                './mnt/inputs/origin/sample_submission.csv')
+        submission_df = pd.read_csv(
+            './mnt/inputs/origin/sample_submission.csv')
         submission_df = submission_df.set_index('id_code')
         submission_df.loc[test_ids, 'sirna'] = test_preds
         submission_df = submission_df.reset_index()
-        if not sub_filename:
-            filename_base = f'{self.exp_id}_{self.exp_time}_' \
-                f'{best_loss:.5f}_{best_acc:.5f}'
-            sub_filename = f'./mnt/submissions/{filename_base}_sub.csv'
+        filename_base = f'{self.exp_id}_{self.exp_time}_' \
+            f'{best_loss:.5f}_{best_acc:.5f}'
+        sub_filename = f'./mnt/submissions/{filename_base}_sub.csv'
         submission_df.to_csv(sub_filename, index=False)
 
         sel_log(f'Saved submission file to {sub_filename} !', self.logger)
-        return sub_filename
+        line_message = f'Finished the whole pipeline ! \n' \
+            f'Training time : {self.trn_time} min \n' \
+            f'Best valid loss : {best_loss:.5f} \n' \
+            f'Best valid acc : {best_acc:.5f}'
+        send_line_notification(line_message)
 
     def plot_history(self):
         raise NotImplementedError()

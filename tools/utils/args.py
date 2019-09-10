@@ -25,7 +25,6 @@ def parse_args(logger=None):
                         type=str,
                         required=False,
                         default=None)
-
     parser.add_argument('-m', '--message',
                         help='messages about the process',
                         type=str,
@@ -38,6 +37,12 @@ def parse_args(logger=None):
                         help='flag which specifies prediction mode',
                         action='store_true',
                         default=False)
+    parser.add_argument('-c', '--cell_types',
+                        help='cell types',
+                        nargs='+',
+                        type=str,
+                        default=['ALL'])
+
     args = parser.parse_args()
     sel_log(f'args: {sorted(vars(args).items())}', logger)
     return args
