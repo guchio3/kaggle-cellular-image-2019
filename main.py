@@ -29,12 +29,13 @@ if __name__ == '__main__':
         from tools.runners.r003_metric_learning import Runner
     runner = Runner(configs, args, logger)
     if not args.prediction:
-        runner.train_model()
+        if len(args.cell_types) != 1:
+            raise Exception('you can use just one cell type for train')
+        cell_type = args.cell_types[0]
+        runner.train_model(cell_type)
     else:
-        runner.make_submission_file()
+        sub_filename = None
+        for i, cell_type in enumerate(args.cell_types):
+            sub_filename = runner.make_submission_file(cell_type, sub_filename)
 
-    prec_time = time.time() - t0
-#    send_line_notification(f'Finished: {script_name} '
-#                           f'using CONFIG: {exp_id} '
-#                           f'w/ MAPE {mape_mean:.5f}+-{mape_std:.5f} '
-#                           f'in {prec_time:.1f} s !')
+    send_line_notification(f'Finished cell_type {args.cell_type}')
