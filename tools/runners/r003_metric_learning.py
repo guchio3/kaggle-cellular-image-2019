@@ -60,6 +60,11 @@ class Runner(object):
             'valid_loss': [],
             'valid_acc': [],
         }
+        self.base_weight = args.base_weight
+        if args.base_weight:
+            self.model
+            checkpoint = torch.load(args.base_weight)
+            self.model.load_state_dict(checkpoint['model_state_dict'])
 
     def _get_fobj(self, fobj_type):
         if fobj_type == 'ce':
@@ -329,17 +334,14 @@ class Runner(object):
         return best_filename, best_loss, best_acc
 
     def _load_best_model(self, cell_type):
-        best_cp_filename, best_loss, best_acc = self._search_best_filename(cell_type)
+        best_cp_filename, best_loss, best_acc = self._search_best_filename(
+            cell_type)
         sel_log(f'the best file is {best_cp_filename} !', self.logger)
         _ = self._load_checkpoint(best_cp_filename)
         return best_loss, best_acc
 
     def _trn_val_split(self, split_type, split_num, cell_type):
         trn_df = pd.read_csv('./mnt/inputs/origin/train.csv.zip')
-        if cell_type not in ['ALL', 'HEPG2', 'U2OS', 'HUVEC', 'RPE']:
-            raise Exception(f'invalid cell type {cell_type}')
-        if cell_type != 'all':
-            trn_df = trn_df[trn_df.experiment.str.contains(cell_type)]
 
         if split_type == 'gkf':
             fold = gkf(split_num).split(
@@ -356,9 +358,19 @@ class Runner(object):
                 random_state=71)
         else:
             raise Exception(f'invalid split type: {split_type}')
+        if cell_type not in ['ALL', 'HEPG2', 'U2OS', 'HUVEC', 'RPE']:
+            raise Exception(f'invalid cell type {cell_type}')
         for trn_idx, val_idx in fold:
-            trn_ids = trn_df.iloc[trn_idx].id_code
-            val_ids = trn_df.iloc[val_idx].id_code
+            if cell_type != 'all':
+                _trn_df = trn_df.iloc[trn_idx]
+                trn_ids = _trn_df[_trn_df.experiment.str.contains(
+                    cell_type)].id_code
+                _val_df = trn_df.iloc[val_idx]
+                val_ids = _val_df[_val_df.experiment.str.contains(
+                    cell_type)].id_code
+            else:
+                trn_ids = trn_df.iloc[trn_idx].id_code
+                val_ids = trn_df.iloc[val_idx].id_code
             break
         return trn_ids, val_ids
 
@@ -372,6 +384,8 @@ class Runner(object):
         return tst_ids
 
     def _warmup_setting(self, epoch):
+        if self.base_weight:
+            return
         if epoch == 1:
             # for name, child in self.model.named_children():
             for name, child in self.model.module.named_children():
@@ -392,7 +406,8 @@ class Runner(object):
     # -------
 
     def train_model(self, cell_type='ALL'):
-        trn_ids, val_ids = self._trn_val_split(self.split_type, self.split_num, cell_type)
+        trn_ids, val_ids = self._trn_val_split(
+            self.split_type, self.split_num, cell_type)
         if self.debug:
             trn_ids = trn_ids[:300]
             val_ids = val_ids[:300]
@@ -434,7 +449,8 @@ class Runner(object):
             self.histories['valid_acc'].append(valid_acc)
 
             self.scheduler.step()
-            self._save_checkpoint(current_epoch, valid_loss, valid_acc, cell_type)
+            self._save_checkpoint(
+                current_epoch, valid_loss, valid_acc, cell_type)
 
         self.trn_time = int(time.time() - epoch_start_time) // 60
         del train_loader, valid_loader

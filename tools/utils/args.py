@@ -25,6 +25,11 @@ def parse_args(logger=None):
                         type=str,
                         required=False,
                         default=None)
+    parser.add_argument('-b', '--base_weight',
+                        help='',
+                        type=str,
+                        required=False,
+                        default=None)
     parser.add_argument('-m', '--message',
                         help='messages about the process',
                         type=str,
