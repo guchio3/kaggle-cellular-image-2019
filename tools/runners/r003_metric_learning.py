@@ -54,6 +54,7 @@ class Runner(object):
             self.augment = config['augment']
         else:
             self.augment = []
+        self.metric = True if 'metric' in config['model']['model_type'] else False
         self.logger = logger
         self.histories = {
             'train_loss': [],
@@ -207,8 +208,10 @@ class Runner(object):
                 self.device, dtype=torch.float), labels.to(
                 self.device)
 
-            # outputs = self.model.forward(images)
-            outputs = self.model.forward(images, labels)
+            if self.metric:
+                outputs = self.model.forward(images, labels)
+            else:
+                outputs = self.model.forward(images)
 
             train_loss = self.fobj(outputs, labels)
 
