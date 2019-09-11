@@ -364,7 +364,7 @@ class Runner(object):
         if cell_type not in ['ALL', 'HEPG2', 'U2OS', 'HUVEC', 'RPE']:
             raise Exception(f'invalid cell type {cell_type}')
         for trn_idx, val_idx in fold:
-            if cell_type != 'all':
+            if cell_type != 'ALL':
                 _trn_df = trn_df.iloc[trn_idx]
                 trn_ids = _trn_df[_trn_df.experiment.str.contains(
                     cell_type)].id_code

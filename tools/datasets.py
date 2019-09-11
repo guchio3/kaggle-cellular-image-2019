@@ -4,20 +4,19 @@ from functools import partial
 from itertools import chain
 from multiprocessing import Pool
 
+import cv2
 import numpy as np
 import pandas as pd
 # import rxrx.io as rio
 import torch
-from PIL import Image
-from torch.utils.data import Dataset
-from torchvision import transforms as T
-from tqdm import tqdm
-
-import cv2
 from albumentations import (Compose, HorizontalFlip, HueSaturationValue,
                             Normalize, RandomBrightnessContrast,
                             RandomRotate90, Resize, Rotate, ShiftScaleRotate,
                             VerticalFlip)
+from PIL import Image
+from torch.utils.data import Dataset
+from torchvision import transforms as T
+from tqdm import tqdm
 
 from .utils.logs import sel_log
 
@@ -165,12 +164,15 @@ class CellularImageDataset(Dataset):
                 )
                 """
 
-#             if not visualize:
-#                 aug_list.append(
-#                     Normalize(
-#                         p=1.0, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-#                     )  # rgb
-#                 )  # based on imagenet
+            #  if not visualize:
+            if 'normalize' in self.augment:
+                aug_list.append(
+                    Normalize(
+                        p=1.0,
+                        mean=[0.485, 0.456, 0.406, 0.485, 0.456, 0.406],
+                        std=[0.229, 0.224, 0.225, 0.229, 0.224, 0.225]
+                    )  # rgb -> 6 channels
+                )  # based on imagenet
 
             return Compose(aug_list, p=1.0)
 

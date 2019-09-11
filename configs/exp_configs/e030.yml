@@ -1,8 +1,8 @@
-description: arcface, easy_mergin, augment, cellwise
+description: arcface, easy_mergin, augment
 runner: r003
 device: cuda
-batch_size: 16
-max_epoch: 30
+batch_size: 32
+max_epoch: 40
 fobj: ce
 model:
     model_type: efficientnetb2_metric
@@ -21,3 +21,4 @@ augment:
     - verticalflip
     - horizontalflip
     - randomrotate90
+    - normalize
