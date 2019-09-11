@@ -12,7 +12,7 @@ import torch
 from albumentations import (Compose, HorizontalFlip, HueSaturationValue,
                             Normalize, RandomBrightnessContrast,
                             RandomRotate90, Resize, Rotate, ShiftScaleRotate,
-                            VerticalFlip)
+                            VerticalFlip, RandomSizedCrop)
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms as T
@@ -147,6 +147,15 @@ class CellularImageDataset(Dataset):
                     aug_list.append(RandomRotate90(p=0.5))
                 if 'rotate' in self.augment:
                     aug_list.append(Rotate(p=0.5))
+                if 'brightness'in self.augment:
+                    aug_list.append(RandomBrightnessContrast(p=0.5))
+                if 'randomsizedcrop'in self.augment:
+                    aug_list.append(RandomSizedCrop(
+                        min_max_height=(128, 128),
+                        height=512,
+                        width=512,
+                        p=0.5,
+                    ))
 
                 # if you want to use additional augmentation, add operations like below.
                 # albumentations: [https://github.com/albu/albumentations]

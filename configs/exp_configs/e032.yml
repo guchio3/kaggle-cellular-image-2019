@@ -18,7 +18,6 @@ split:
     split_type: cskf
     split_num: 5
 augment:
-    - verticalflip
     - horizontalflip
     - randomrotate90
-      #    - normalize
+    - randomsizedcrop
