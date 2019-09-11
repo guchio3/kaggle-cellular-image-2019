@@ -38,4 +38,4 @@ if __name__ == '__main__':
         for i, cell_type in enumerate(args.cell_types):
             sub_filename = runner.make_submission_file(cell_type, sub_filename)
 
-    send_line_notification(f'Finished cell_type {args.cell_type}')
+    send_line_notification(f'Finished cell_type {args.cell_types}')

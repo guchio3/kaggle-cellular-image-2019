@@ -324,8 +324,8 @@ class Runner(object):
             if cell_type not in filename:
                 continue
             split_filename = filename.split('/')[-1].split('_')
-            temp_loss = float(split_filename[2])
-            temp_acc = float(split_filename[3])
+            temp_loss = float(split_filename[5])
+            temp_acc = float(split_filename[6])
             # if temp_loss < best_loss:
             if temp_acc > best_acc:
                 best_loss = temp_loss
@@ -378,7 +378,7 @@ class Runner(object):
         tst_df = pd.read_csv('./mnt/inputs/origin/test.csv')
         if cell_type not in ['ALL', 'HEPG2', 'U2OS', 'HUVEC', 'RPE']:
             raise Exception(f'invalid cell type {cell_type}')
-        if cell_type != 'all':
+        if cell_type != 'ALL':
             tst_df = tst_df[tst_df.experiment.str.contains(cell_type)]
         tst_ids = tst_df.id_code
         return tst_ids
@@ -457,7 +457,7 @@ class Runner(object):
         gc.collect()
 
     def make_submission_file(self, cell_type='ALL', sub_filename=None):
-        tst_ids = self._get_test_ids()
+        tst_ids = self._get_test_ids(cell_type)
         if self.debug:
             tst_ids = tst_ids[:300]
         test_loader = self._build_loader(
