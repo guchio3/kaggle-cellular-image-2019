@@ -1,0 +1,22 @@
+description: arcface, easy_mergin, augment, densenet201
+runner: r003
+device: cuda
+batch_size: 32
+max_epoch: 40
+fobj: ce
+model:
+    model_type: densenet201_metric
+    pretrained: true
+optimizer: 
+    optim_type: adam
+    lr: 0.001
+scheduler:
+    scheduler_type: cosine
+sampler:
+    sampler_type: random
+split: 
+    split_type: cskf
+    split_num: 5
+augment:
+    - horizontalflip
+    - randomrotate90

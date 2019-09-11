@@ -23,11 +23,11 @@ from .utils.logs import sel_log
 # sys.path.append('../tools/utils/rxrx1-utils')
 
 IMAGE_SIZE = 512
+RESIZE_IMAGE_SIZE = 384
 
 
 def _load_imgs_from_ids(id_pair, mode):
     _id, label = id_pair
-    images = []
     split_id = _id.split('_')
     if mode == 'valid':
         mode = 'train'
@@ -139,6 +139,11 @@ class CellularImageDataset(Dataset):
 #             )
 
             if mode == "train":  # use data augmentation only with train mode
+                if 'resize' in self.augment:
+                    aug_list.append(Resize(RESIZE_IMAGE_SIZE,
+                                           RESIZE_IMAGE_SIZE,
+                                           interpolation=cv2.INTER_CUBIC,
+                                           p=1.0))
                 if 'verticalflip' in self.augment:
                     aug_list.append(VerticalFlip(p=0.5))
                 if 'horizontalflip' in self.augment:
