@@ -1,15 +1,11 @@
-<<<<<<< HEAD
-description: randomrate90, p=1.
-=======
-description: arcface, easy_mergin, augment
->>>>>>> 1ab603a1091613e88453569c5e943e59089162e3
+description: arcface, easy_mergin, augment, densenet201
 runner: r003
 device: cuda
 batch_size: 32
 max_epoch: 40
 fobj: ce
 model:
-    model_type: efficientnetb2_metric
+    model_type: densenet201_metric
     pretrained: true
 optimizer: 
     optim_type: adam
@@ -24,7 +20,3 @@ split:
 augment:
     - horizontalflip
     - randomrotate90
-<<<<<<< HEAD
-=======
-    - brightness
->>>>>>> 1ab603a1091613e88453569c5e943e59089162e3

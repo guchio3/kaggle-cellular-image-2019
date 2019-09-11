@@ -18,7 +18,7 @@ from tqdm import tqdm
 
 from ..datasets import CellularImageDataset, ImagesDS
 from ..models import (efficientnetb2, efficientnetb2_metric, efficientnetb4,
-                      efficientnetb5, efficientnetb7, resnet18)
+                      efficientnetb5, efficientnetb7, resnet18, densenet201_metric)
 from ..schedulers import CosineAnnealingWarmUpRestarts as cawur
 from ..schedulers import pass_scheduler
 from ..utils.logs import sel_log, send_line_notification
@@ -96,6 +96,8 @@ class Runner(object):
             model = efficientnetb7.Network(pretrained, 1108)
         elif model_type == 'efficientnetb2_metric':
             model = efficientnetb2_metric.Network(pretrained, 1108)
+        elif model_type == 'densenet201_metric':
+            model = densenet201_metric.Network(pretrained, 1108)
         else:
             raise Exception(f'invalid model_type: {model_type}')
         # return model.to(self.device)
