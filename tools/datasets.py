@@ -151,7 +151,7 @@ class CellularImageDataset(Dataset):
                     aug_list.append(RandomBrightnessContrast(p=0.5))
                 if 'randomsizedcrop'in self.augment:
                     aug_list.append(RandomSizedCrop(
-                        min_max_height=(128, 128),
+                        min_max_height=(256, 512),
                         height=512,
                         width=512,
                         p=0.5,
