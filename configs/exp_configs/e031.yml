@@ -21,4 +21,3 @@ augment:
     - horizontalflip
     - randomrotate90
     - brightness
-      
