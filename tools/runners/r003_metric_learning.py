@@ -17,24 +17,13 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from ..datasets import CellularImageDataset, ImagesDS
-from ..models import (efficientnetb2, efficientnetb2_metric, efficientnetb4,
-                      efficientnetb5, efficientnetb7, resnet18, densenet201_metric)
+from ..models import (densenet201_metric, efficientnetb2,
+                      efficientnetb2_metric, efficientnetb2_metric_bn,
+                      efficientnetb4, efficientnetb5, efficientnetb7, resnet18)
 from ..schedulers import CosineAnnealingWarmUpRestarts as cawur
 from ..schedulers import pass_scheduler
 from ..utils.logs import sel_log, send_line_notification
 from ..utils.splittings import CellwiseStratifiedKFold as cskf
-
-
-def seed_everything(seed):
-    random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True
-
-
-seed_everything(71)
 
 
 class Runner(object):
@@ -96,6 +85,8 @@ class Runner(object):
             model = efficientnetb7.Network(pretrained, 1108)
         elif model_type == 'efficientnetb2_metric':
             model = efficientnetb2_metric.Network(pretrained, 1108)
+        elif model_type == 'efficientnetb2_metric_bn':
+            model = efficientnetb2_metric_bn.Network(pretrained, 1108)
         elif model_type == 'densenet201_metric':
             model = densenet201_metric.Network(pretrained, 1108)
         else:

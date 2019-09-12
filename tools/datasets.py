@@ -84,7 +84,10 @@ class CellularImageDataset(Dataset):
         img = self._augmentation(img)
         img = img.transpose(2, 0, 1)  # (h, w, c) -> (c, h, w)
 
-        assert img.shape == (6, IMAGE_SIZE, IMAGE_SIZE)
+        if 'resize' in self.augment:
+            assert img.shape == (6, RESIZE_IMAGE_SIZE, RESIZE_IMAGE_SIZE)
+        else:
+            assert img.shape == (6, IMAGE_SIZE, IMAGE_SIZE)
 
         return (self.ids[idx], torch.tensor(img),
                 torch.tensor(self.labels[idx]))
@@ -130,26 +133,19 @@ class CellularImageDataset(Dataset):
         def _albumentations(mode, visualize):
             aug_list = []
 
-#             aug_list.append(
-#                 Resize(
-#                     IMAGE_SIZE,
-#                     IMAGE_SIZE,
-#                     interpolation=cv2.INTER_CUBIC,
-#                     p=1.0)
-#             )
+            if 'resize' in self.augment:
+                aug_list.append(Resize(RESIZE_IMAGE_SIZE,
+                                       RESIZE_IMAGE_SIZE,
+                                       interpolation=cv2.INTER_CUBIC,
+                                       p=1.0))
 
             if mode == "train":  # use data augmentation only with train mode
-                if 'resize' in self.augment:
-                    aug_list.append(Resize(RESIZE_IMAGE_SIZE,
-                                           RESIZE_IMAGE_SIZE,
-                                           interpolation=cv2.INTER_CUBIC,
-                                           p=1.0))
                 if 'verticalflip' in self.augment:
                     aug_list.append(VerticalFlip(p=0.5))
                 if 'horizontalflip' in self.augment:
                     aug_list.append(HorizontalFlip(p=0.5))
                 if 'randomrotate90' in self.augment:
-                    aug_list.append(RandomRotate90(p=0.5))
+                    aug_list.append(RandomRotate90(p=1.))
                 if 'rotate' in self.augment:
                     aug_list.append(Rotate(p=0.5))
                 if 'brightness'in self.augment:

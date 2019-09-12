@@ -1,10 +1,25 @@
 import os
 import time
+import random
 from logging import getLogger
+import numpy as np
+import torch
 
 from tools.utils.args import parse_args
 from tools.utils.configs import load_configs
 from tools.utils.logs import logInit, sel_log, send_line_notification
+
+
+def seed_everything(seed):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+
+
+seed_everything(71)
 
 
 CONFIG_DIR = './configs/exp_configs/'
