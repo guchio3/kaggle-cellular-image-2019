@@ -169,7 +169,7 @@ class Runner(object):
                 )
             else:
                 raise Exception(f'invalid sampler_type: {sampler_type}')
-        else:  # valid, test
+        else:  # test
             sampler = torch.utils.data.sampler.SequentialSampler(
                 data_source=dataset)
             # data_source=dataset.image_files)
