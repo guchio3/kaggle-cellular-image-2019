@@ -23,7 +23,7 @@ from .utils.logs import sel_log
 # sys.path.append('../tools/utils/rxrx1-utils')
 
 IMAGE_SIZE = 512
-RESIZE_IMAGE_SIZE = 384
+RESIZE_IMAGE_SIZE = 256
 
 
 def _load_imgs_from_ids(id_pair, mode):
