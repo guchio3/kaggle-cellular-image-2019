@@ -394,7 +394,7 @@ class Runner(object):
         if epoch == 1:
             # for name, child in self.model.named_children():
             for name, child in self.model.module.named_children():
-                if 'fc' in name or 'arc' in name:
+                if 'fc' in name or 'arc' in name or '_conv_stem' in name or 'bn00' in name:
                     sel_log(name + ' is unfrozen', self.logger)
                     for param in child.parameters():
                         param.requires_grad = True
