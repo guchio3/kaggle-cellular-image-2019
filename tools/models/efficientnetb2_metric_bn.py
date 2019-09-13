@@ -12,7 +12,7 @@ class Network(nn.Module):
         self.model = EfficientNet.from_pretrained(
             'efficientnet-b2', num_classes=n_classes)
 
-        self.bn00 = nn.BatchNorm2d(6).to('cuda')
+        self.model.bn00 = nn.BatchNorm2d(6)# .to('cuda')
         new_conv = nn.Conv2d(
             6,
             32,
@@ -25,23 +25,23 @@ class Network(nn.Module):
                 [torch.mean(self.model._conv_stem.weight, 1)] * 6, dim=1)
         self.model._conv_stem = new_conv
         self.model._fc = myIdentity(in_features=self.model._fc.in_features)
-        self.arc = ArcMarginProduct(
+        self.model.arc = ArcMarginProduct(
             in_features=self.model._fc.in_features,
             out_features=n_classes,
             easy_margin=True,
-        ).to('cuda')
+        )# .to('cuda')
 
         # weight initialization
         if not pretrained:
             self._init_weight()
 
     def forward(self, x, labels=None):
-        x = self.bn00(x)
+        x = self.model.bn00(x)
         if labels is None:
             with torch.no_grad():
                 labels = torch.zeros(x.shape[0], device='cuda')
         features = self.model(x)
-        out = self.arc(features, labels)
+        out = self.model.arc(features, labels)
         return out
 
     def named_children(self):
