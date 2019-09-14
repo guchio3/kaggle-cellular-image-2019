@@ -61,7 +61,8 @@ class Runner(object):
         }
         self.base_weight = args.base_weight
         if args.base_weight:
-            self.model
+            if args.base_weight == 'best_all':
+                args.bese_weight = self._search_best_filename('ALL')
             checkpoint = torch.load(args.base_weight)
             self.model.load_state_dict(checkpoint['model_state_dict'])
 
@@ -278,11 +279,6 @@ class Runner(object):
                     self.device, dtype=torch.float), labels.to(
                     self.device)
                 outputs = self.model.forward(images)
-                # avg predictions
-                # outputs = torch.mean(outputs.reshape((-1, 1108, 2)), 2)
-                # outputs = torch.mean(torch.stack(
-                #     [outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
-                # _, predicted = torch.max(outputs.data, 1)
                 sm_outputs = softmax(outputs, dim=1)
                 sm_outputs = torch.mean(torch.stack(
                     [sm_outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)

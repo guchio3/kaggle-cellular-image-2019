@@ -1,5 +1,5 @@
-description: arcface, easy_mergin, augment, bn
-runner: r003
+description: arcface, easy_mergin, augment, bn, random test sampler
+runner: r004
 device: cuda
 batch_size: 64
 max_epoch: 40
