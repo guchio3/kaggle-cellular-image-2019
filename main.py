@@ -42,6 +42,8 @@ if __name__ == '__main__':
         from tools.runners.r002_warmup_separate import Runner
     elif configs['runner'] == 'r003':
         from tools.runners.r003_metric_learning import Runner
+    elif configs['runner'] == 'r004':
+        from tools.runners.r004_test_random_sampler import Runner
     runner = Runner(configs, args, logger)
     if not args.prediction:
         if len(args.cell_types) != 1:
