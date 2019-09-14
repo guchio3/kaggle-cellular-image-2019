@@ -1,15 +1,15 @@
-description: arcface, easy_mergin, augment, densenet201
-runner: r003
+description: arcface, easy_mergin, augment, size w/ batchnorm
+runner: r004
 device: cuda
-batch_size: 32
-max_epoch: 40
+batch_size: 128
+max_epoch: 64
 fobj: ce
 model:
-    model_type: efficientnetb2_metric_bn
+    model_type: efficientnetb2_metric
     pretrained: true
 optimizer: 
     optim_type: adam
-    lr: 0.0001
+    lr: 0.001
 scheduler:
     scheduler_type: cosine
 sampler:
