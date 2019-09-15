@@ -39,12 +39,6 @@ def _load_imgs_from_ids(id_pair, mode, dlt_bias, dlt_var):
         for w in [1, 2, 3, 4, 5, 6]:
             # 0 means gray scale
             img = cv2.imread(f'{filename_base}_s{site}_w{w}.png', 0)
-            if dlt_bias:
-                pass
-                # img -= img.mean()
-            if dlt_var:
-                pass
-                # img /= img.std()
             _images.append(img)
 #        images.append(
 #            np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6))
@@ -55,7 +49,7 @@ def _load_imgs_from_ids(id_pair, mode, dlt_bias, dlt_var):
 
 class CellularImageDataset(Dataset):
     def __init__(self, mode, ids, augment,
-                 visualize=False, logger=None, dlt_bias=False, dlt_var=False):
+                 visualize=False, logger=None):
         '''
         ids : id_code
         '''
@@ -64,16 +58,13 @@ class CellularImageDataset(Dataset):
         self.logger = logger
         self.augment = augment
         self.len = None
-        self.dlt_bias = dlt_bias
-        self.dlt_var = dlt_var
 
         if mode == "test":
             labels = [0] * len(ids)
         else:  # train or valid
             labels = pd.read_csv('./mnt/inputs/origin/train.csv.zip')\
                 .set_index('id_code').loc[ids]['sirna'].values
-        self.ids, self.images, self.labels = self._parse_ids(
-            mode, ids, labels, dlt_bias, dlt_var)
+        self.ids, self.images, self.labels = self._parse_ids(mode, ids, labels)
 
         # load validation
         assert len(self.images) == len(self.labels)
@@ -109,7 +100,7 @@ class CellularImageDataset(Dataset):
             .reset_index(drop=True)\
             .to_dict()
 
-    def _parse_ids(self, mode, ids, original_labels, dlt_bias, dlt_var):
+    def _parse_ids(self, mode, ids, original_labels):
         #        ids = ids[:300]
         #        original_labels = original_labels[:300]
         assert len(ids) == len(original_labels)
@@ -122,9 +113,7 @@ class CellularImageDataset(Dataset):
             # self だとエラー
             iter_func = partial(
                 _load_imgs_from_ids,
-                mode=mode,
-                dlt_bias=dlt_bias,
-                dlt_var=dlt_var)
+                mode=mode)
             imap = p.imap_unordered(iter_func, list(zip(ids, original_labels)))
             res_id_pairs = list(tqdm(imap, total=len(ids)))
             p.close()
@@ -140,7 +129,7 @@ class CellularImageDataset(Dataset):
 
         return ids, images, labels
 
-    def _augmentation(self, img):
+    def _augmentation(self, img, id_code, site):
         # -------
         def _albumentations(mode, visualize):
             aug_list = []
@@ -188,6 +177,7 @@ class CellularImageDataset(Dataset):
 
             #  if not visualize:
             if 'normalize' in self.augment:
+                id_code, site
                 aug_list.append(
                     Normalize(
                         p=1.0,
