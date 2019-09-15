@@ -187,7 +187,7 @@ class Runner(object):
         return sampler
 
     def _build_loader(self, mode, ids, augment, batch_size=None):
-        dataset = CellularImageDataset(mode, ids, augment, self.dlt_bias, self.dlt_var)
+        dataset = CellularImageDataset(mode, ids, augment, dlt_bias=self.dlt_bias, dlt_var=self.dlt_var)
         # dataset = ImagesDS(ids, './mnt/inputs/', mode)
         sampler = self._get_sampler(dataset, mode, self.sampler_type)
         drop_last = True if mode == 'train' else False
