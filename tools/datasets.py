@@ -26,7 +26,7 @@ IMAGE_SIZE = 512
 RESIZE_IMAGE_SIZE = 256
 
 
-def _load_imgs_from_ids(id_pair, mode, dlt_bias=False):
+def _load_imgs_from_ids(id_pair, mode, dlt_bias, dlt_var):
     _id, label = id_pair
     split_id = _id.split('_')
     if mode == 'valid':
@@ -41,6 +41,8 @@ def _load_imgs_from_ids(id_pair, mode, dlt_bias=False):
             img = cv2.imread(f'{filename_base}_s{site}_w{w}.png', 0)
             if dlt_bias:
                 img -= img.mean()
+            if dlt_var:
+                img /= img.std()
             _images.append(img)
 #        images.append(
 #            np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6))
@@ -51,7 +53,7 @@ def _load_imgs_from_ids(id_pair, mode, dlt_bias=False):
 
 class CellularImageDataset(Dataset):
     def __init__(self, mode, ids, augment,
-                 visualize=False, logger=None, dlt_bias=False):
+                 visualize=False, logger=None, dlt_bias=False, dlt_var=False):
         '''
         ids : id_code
         '''
@@ -67,7 +69,7 @@ class CellularImageDataset(Dataset):
             labels = pd.read_csv('./mnt/inputs/origin/train.csv.zip')\
                 .set_index('id_code').loc[ids]['sirna'].values
         self.ids, self.images, self.labels = self._parse_ids(
-            mode, ids, labels, dlt_bias)
+            mode, ids, labels, dlt_bias, dlt_var)
 
         # load validation
         assert len(self.images) == len(self.labels)
@@ -103,7 +105,7 @@ class CellularImageDataset(Dataset):
             .reset_index(drop=True)\
             .to_dict()
 
-    def _parse_ids(self, mode, ids, original_labels, dlt_bias):
+    def _parse_ids(self, mode, ids, original_labels, dlt_bias, dlt_var):
         #        ids = ids[:300]
         #        original_labels = original_labels[:300]
         assert len(ids) == len(original_labels)
@@ -117,7 +119,8 @@ class CellularImageDataset(Dataset):
             iter_func = partial(
                 _load_imgs_from_ids,
                 mode=mode,
-                dlt_bias=dlt_bias)
+                dlt_bias=dlt_bias,
+                dlt_var=dlt_var)
             imap = p.imap_unordered(iter_func, list(zip(ids, original_labels)))
             res_id_pairs = list(tqdm(imap, total=len(ids)))
             p.close()
