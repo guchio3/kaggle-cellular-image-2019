@@ -40,9 +40,11 @@ def _load_imgs_from_ids(id_pair, mode, dlt_bias, dlt_var):
             # 0 means gray scale
             img = cv2.imread(f'{filename_base}_s{site}_w{w}.png', 0)
             if dlt_bias:
-                img -= img.mean()
+                pass
+                # img -= img.mean()
             if dlt_var:
-                img /= img.std()
+                pass
+                # img /= img.std()
             _images.append(img)
 #        images.append(
 #            np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6))
@@ -62,6 +64,8 @@ class CellularImageDataset(Dataset):
         self.logger = logger
         self.augment = augment
         self.len = None
+        self.dlt_bias = dlt_bias
+        self.dlt_var = dlt_var
 
         if mode == "test":
             labels = [0] * len(ids)
@@ -225,6 +229,13 @@ class CellularImageDataset(Dataset):
             return img
         # -------
 
+        if self.dlt_bias:
+            means, stds = [], []
+            for i in range(6):
+                _img = img[:, :, i]
+                means.append(_img.mean())
+                stds.append(_img.std())
+            img = Normalize(mean=means, std=stds).apply(img)
         img = _albumentations(self.mode, self.visualize)(image=img)["image"]
 #        if (
 #            self.mode == "train"
