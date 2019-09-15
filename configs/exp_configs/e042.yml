@@ -4,14 +4,14 @@ device: cuda
 batch_size: 64
 max_epoch: 40
 fobj: ce
-dlt_bias: true
-dlt_var: true
+dlt_bias: false
+dlt_var: false
 model:
     model_type: efficientnetb2_metric
     pretrained: true
 optimizer: 
-    optim_type: adam
-    lr: 0.001
+    optim_type: sgd
+    lr: 0.01
 scheduler:
     scheduler_type: cosine
 sampler:
@@ -22,4 +22,3 @@ split:
 augment:
     - horizontalflip
     - randomrotate90
-    - normalize

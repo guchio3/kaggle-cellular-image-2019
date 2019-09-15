@@ -183,16 +183,16 @@ class CellularImageDataset(Dataset):
             if 'normalize' in self.augment:
                 experiment, plate, well = id_code.split('_')
                 norm_df = self.stats_df.query(
-                        f'experiment == {experiment} and'
-                        f'plate == {plate} and'
-                        f'well == {well} and'
-                        f'site == {site}'
+                        f'experiment == "{experiment}" and '
+                        f'plate == {int(plate)} and '
+                        f'well == "{well}" and '
+                        f'site == {int(site)}'
                 ).sort_values('channel')
                 aug_list.append(
                     Normalize(
                         p=1.0,
-                        mean=norm_df.mean.values,
-                        std=norm_df.std.values
+                        mean=norm_df['mean'].tolist(),
+                        std=norm_df['std'].tolist(),
                         # mean=[0.485, 0.456, 0.406, 0.485, 0.456, 0.406],
                         # std=[0.229, 0.224, 0.225, 0.229, 0.224, 0.225]
                     )  # rgb -> 6 channels
