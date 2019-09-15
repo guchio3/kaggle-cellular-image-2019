@@ -48,14 +48,6 @@ class Runner(object):
         self.sampler_type = config['sampler']['sampler_type']
         self.split_type = config['split']['split_type']
         self.split_num = config['split']['split_num']
-        if 'dlt_bias' in config:
-            self.dlt_bias = config['dlt_bias']
-        else:
-            self.dlt_bias = False
-        if 'dlt_var' in config:
-            self.dlt_var = config['dlt_var']
-        else:
-            self.dlt_var = False
         if 'augment' in config:
             self.augment = config['augment']
         else:
@@ -187,7 +179,7 @@ class Runner(object):
         return sampler
 
     def _build_loader(self, mode, ids, augment, batch_size=None):
-        dataset = CellularImageDataset(mode, ids, augment, dlt_bias=self.dlt_bias, dlt_var=self.dlt_var)
+        dataset = CellularImageDataset(mode, ids, augment)
         # dataset = ImagesDS(ids, './mnt/inputs/', mode)
         sampler = self._get_sampler(dataset, mode, self.sampler_type)
         drop_last = True if mode == 'train' else False

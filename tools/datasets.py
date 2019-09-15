@@ -26,7 +26,7 @@ IMAGE_SIZE = 512
 RESIZE_IMAGE_SIZE = 256
 
 
-def _load_imgs_from_ids(id_pair, mode, dlt_bias, dlt_var):
+def _load_imgs_from_ids(id_pair, mode):
     _id, label = id_pair
     split_id = _id.split('_')
     if mode == 'valid':
@@ -43,7 +43,7 @@ def _load_imgs_from_ids(id_pair, mode, dlt_bias, dlt_var):
 #        images.append(
 #            np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6))
         res_id_pairs.append(
-            [_id, np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6), label])
+            [_id, np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6), label, site])
     return res_id_pairs
 
 
@@ -64,7 +64,8 @@ class CellularImageDataset(Dataset):
         else:  # train or valid
             labels = pd.read_csv('./mnt/inputs/origin/train.csv.zip')\
                 .set_index('id_code').loc[ids]['sirna'].values
-        self.ids, self.images, self.labels = self._parse_ids(mode, ids, labels)
+        self.ids, self.images, self.labels, self.sites = self._parse_ids(mode, ids, labels)
+        self.stats_df = pd.read_csv('./mnt/inputs/origin/pixel_stats.csv.zip')
 
         # load validation
         assert len(self.images) == len(self.labels)
@@ -79,8 +80,10 @@ class CellularImageDataset(Dataset):
         if self.len:
             idx = self.id_converter[idx]
         img = self.images[idx]
+        id_code = self.ids[idx]
+        site = self.sites[idx]
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # RGB
-        img = self._augmentation(img)
+        img = self._augmentation(img, id_code, site)
         img = img.transpose(2, 0, 1)  # (h, w, c) -> (c, h, w)
 
         if 'resize' in self.augment:
@@ -121,13 +124,14 @@ class CellularImageDataset(Dataset):
             gc.collect()
         res_id_pairs = list(chain.from_iterable(res_id_pairs))
 
-        ids, images, labels = [], [], []
+        ids, images, labels, sites = [], [], [], []
         for res_id_pair in res_id_pairs:
             ids.append(res_id_pair[0])
             images.append(res_id_pair[1])
             labels.append(res_id_pair[2])
+            sites.append(res_id_pair[3])
 
-        return ids, images, labels
+        return ids, images, labels, sites
 
     def _augmentation(self, img, id_code, site):
         # -------
@@ -177,12 +181,20 @@ class CellularImageDataset(Dataset):
 
             #  if not visualize:
             if 'normalize' in self.augment:
-                id_code, site
+                experiment, plate, well = id_code.split('_')
+                norm_df = self.stats_df.query(
+                        f'experiment == {experiment} and'
+                        f'plate == {plate} and'
+                        f'well == {well} and'
+                        f'site == {site}'
+                ).sort_values('channel')
                 aug_list.append(
                     Normalize(
                         p=1.0,
-                        mean=[0.485, 0.456, 0.406, 0.485, 0.456, 0.406],
-                        std=[0.229, 0.224, 0.225, 0.229, 0.224, 0.225]
+                        mean=norm_df.mean.values,
+                        std=norm_df.std.values
+                        # mean=[0.485, 0.456, 0.406, 0.485, 0.456, 0.406],
+                        # std=[0.229, 0.224, 0.225, 0.229, 0.224, 0.225]
                     )  # rgb -> 6 channels
                 )  # based on imagenet
 
@@ -219,13 +231,13 @@ class CellularImageDataset(Dataset):
             return img
         # -------
 
-        if self.dlt_bias:
-            means, stds = [], []
-            for i in range(6):
-                _img = img[:, :, i]
-                means.append(_img.mean())
-                stds.append(_img.std())
-            img = Normalize(mean=means, std=stds).apply(img)
+#        if self.dlt_bias:
+#            means, stds = [], []
+#            for i in range(6):
+#                _img = img[:, :, i]
+#                means.append(_img.mean())
+#                stds.append(_img.std())
+#            img = Normalize(mean=means, std=stds).apply(img)
         img = _albumentations(self.mode, self.visualize)(image=img)["image"]
 #        if (
 #            self.mode == "train"
