@@ -52,6 +52,10 @@ class Runner(object):
             self.augment = config['augment']
         else:
             self.augment = []
+        if 'dlt_bias' in config:
+            self.dlt_bias = config['dlt_bias']
+        else:
+            self.dlt_bias = False
         self.metric = True if 'metric' in config['model']['model_type'] else False
         self.logger = logger
         self.histories = {

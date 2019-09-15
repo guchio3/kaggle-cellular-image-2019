@@ -4,6 +4,7 @@ device: cuda
 batch_size: 64
 max_epoch: 40
 fobj: ce
+dlt_bias: true
 model:
     model_type: efficientnetb2_metric
     pretrained: true

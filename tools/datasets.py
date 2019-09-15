@@ -11,8 +11,8 @@ import pandas as pd
 import torch
 from albumentations import (Compose, HorizontalFlip, HueSaturationValue,
                             Normalize, RandomBrightnessContrast,
-                            RandomRotate90, Resize, Rotate, ShiftScaleRotate,
-                            VerticalFlip, RandomSizedCrop)
+                            RandomRotate90, RandomSizedCrop, Resize, Rotate,
+                            ShiftScaleRotate, VerticalFlip)
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms as T
@@ -26,7 +26,7 @@ IMAGE_SIZE = 512
 RESIZE_IMAGE_SIZE = 256
 
 
-def _load_imgs_from_ids(id_pair, mode):
+def _load_imgs_from_ids(id_pair, mode, dlt_bias=False):
     _id, label = id_pair
     split_id = _id.split('_')
     if mode == 'valid':
@@ -38,8 +38,10 @@ def _load_imgs_from_ids(id_pair, mode):
         _images = []
         for w in [1, 2, 3, 4, 5, 6]:
             # 0 means gray scale
-            _images.append(
-                cv2.imread(f'{filename_base}_s{site}_w{w}.png', 0))
+            img = cv2.imread(f'{filename_base}_s{site}_w{w}.png', 0)
+            if dlt_bias:
+                img -= img.mean()
+            _images.append(img)
 #        images.append(
 #            np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6))
         res_id_pairs.append(
@@ -49,7 +51,7 @@ def _load_imgs_from_ids(id_pair, mode):
 
 class CellularImageDataset(Dataset):
     def __init__(self, mode, ids, augment,
-                 visualize=False, logger=None):
+                 visualize=False, logger=None, dlt_bias=False):
         '''
         ids : id_code
         '''
@@ -64,7 +66,8 @@ class CellularImageDataset(Dataset):
         else:  # train or valid
             labels = pd.read_csv('./mnt/inputs/origin/train.csv.zip')\
                 .set_index('id_code').loc[ids]['sirna'].values
-        self.ids, self.images, self.labels = self._parse_ids(mode, ids, labels)
+        self.ids, self.images, self.labels = self._parse_ids(
+            mode, ids, labels, dlt_bias)
 
         # load validation
         assert len(self.images) == len(self.labels)
@@ -80,7 +83,6 @@ class CellularImageDataset(Dataset):
             idx = self.id_converter[idx]
         img = self.images[idx]
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # RGB
-
         img = self._augmentation(img)
         img = img.transpose(2, 0, 1)  # (h, w, c) -> (c, h, w)
 
@@ -101,7 +103,7 @@ class CellularImageDataset(Dataset):
             .reset_index(drop=True)\
             .to_dict()
 
-    def _parse_ids(self, mode, ids, original_labels):
+    def _parse_ids(self, mode, ids, original_labels, dlt_bias):
         #        ids = ids[:300]
         #        original_labels = original_labels[:300]
         assert len(ids) == len(original_labels)
@@ -112,7 +114,10 @@ class CellularImageDataset(Dataset):
         sel_log('now loading images ...', self.logger)
         with Pool(os.cpu_count()) as p:
             # self だとエラー
-            iter_func = partial(_load_imgs_from_ids, mode=mode)
+            iter_func = partial(
+                _load_imgs_from_ids,
+                mode=mode,
+                dlt_bias=dlt_bias)
             imap = p.imap_unordered(iter_func, list(zip(ids, original_labels)))
             res_id_pairs = list(tqdm(imap, total=len(ids)))
             p.close()
