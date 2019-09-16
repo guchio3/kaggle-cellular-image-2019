@@ -11,8 +11,8 @@ import pandas as pd
 import torch
 from albumentations import (Compose, HorizontalFlip, HueSaturationValue,
                             Normalize, RandomBrightnessContrast,
-                            RandomRotate90, Resize, Rotate, ShiftScaleRotate,
-                            VerticalFlip, RandomSizedCrop)
+                            RandomRotate90, RandomSizedCrop, Resize, Rotate,
+                            ShiftScaleRotate, VerticalFlip)
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms as T
@@ -23,7 +23,7 @@ from .utils.logs import sel_log
 # sys.path.append('../tools/utils/rxrx1-utils')
 
 IMAGE_SIZE = 512
-RESIZE_IMAGE_SIZE = 384
+RESIZE_IMAGE_SIZE = 256
 
 
 def _load_imgs_from_ids(id_pair, mode):
@@ -38,12 +38,12 @@ def _load_imgs_from_ids(id_pair, mode):
         _images = []
         for w in [1, 2, 3, 4, 5, 6]:
             # 0 means gray scale
-            _images.append(
-                cv2.imread(f'{filename_base}_s{site}_w{w}.png', 0))
+            img = cv2.imread(f'{filename_base}_s{site}_w{w}.png', 0)
+            _images.append(img)
 #        images.append(
 #            np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6))
         res_id_pairs.append(
-            [_id, np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6), label])
+            [_id, np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6), label, site])
     return res_id_pairs
 
 
@@ -64,7 +64,8 @@ class CellularImageDataset(Dataset):
         else:  # train or valid
             labels = pd.read_csv('./mnt/inputs/origin/train.csv.zip')\
                 .set_index('id_code').loc[ids]['sirna'].values
-        self.ids, self.images, self.labels = self._parse_ids(mode, ids, labels)
+        self.ids, self.images, self.labels, self.sites = self._parse_ids(mode, ids, labels)
+        self.stats_df = pd.read_csv('./mnt/inputs/origin/pixel_stats.csv.zip')
 
         # load validation
         assert len(self.images) == len(self.labels)
@@ -79,12 +80,16 @@ class CellularImageDataset(Dataset):
         if self.len:
             idx = self.id_converter[idx]
         img = self.images[idx]
+        id_code = self.ids[idx]
+        site = self.sites[idx]
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # RGB
-
-        img = self._augmentation(img)
+        img = self._augmentation(img, id_code, site)
         img = img.transpose(2, 0, 1)  # (h, w, c) -> (c, h, w)
 
-        assert img.shape == (6, IMAGE_SIZE, IMAGE_SIZE)
+        if 'resize' in self.augment:
+            assert img.shape == (6, RESIZE_IMAGE_SIZE, RESIZE_IMAGE_SIZE)
+        else:
+            assert img.shape == (6, IMAGE_SIZE, IMAGE_SIZE)
 
         return (self.ids[idx], torch.tensor(img),
                 torch.tensor(self.labels[idx]))
@@ -109,7 +114,9 @@ class CellularImageDataset(Dataset):
         sel_log('now loading images ...', self.logger)
         with Pool(os.cpu_count()) as p:
             # self だとエラー
-            iter_func = partial(_load_imgs_from_ids, mode=mode)
+            iter_func = partial(
+                _load_imgs_from_ids,
+                mode=mode)
             imap = p.imap_unordered(iter_func, list(zip(ids, original_labels)))
             res_id_pairs = list(tqdm(imap, total=len(ids)))
             p.close()
@@ -117,33 +124,27 @@ class CellularImageDataset(Dataset):
             gc.collect()
         res_id_pairs = list(chain.from_iterable(res_id_pairs))
 
-        ids, images, labels = [], [], []
+        ids, images, labels, sites = [], [], [], []
         for res_id_pair in res_id_pairs:
             ids.append(res_id_pair[0])
             images.append(res_id_pair[1])
             labels.append(res_id_pair[2])
+            sites.append(res_id_pair[3])
 
-        return ids, images, labels
+        return ids, images, labels, sites
 
-    def _augmentation(self, img):
+    def _augmentation(self, img, id_code, site):
         # -------
         def _albumentations(mode, visualize):
             aug_list = []
 
-#             aug_list.append(
-#                 Resize(
-#                     IMAGE_SIZE,
-#                     IMAGE_SIZE,
-#                     interpolation=cv2.INTER_CUBIC,
-#                     p=1.0)
-#             )
+            if 'resize' in self.augment:
+                aug_list.append(Resize(RESIZE_IMAGE_SIZE,
+                                       RESIZE_IMAGE_SIZE,
+                                       interpolation=cv2.INTER_CUBIC,
+                                       p=1.0))
 
             if mode == "train":  # use data augmentation only with train mode
-                if 'resize' in self.augment:
-                    aug_list.append(Resize(RESIZE_IMAGE_SIZE,
-                                           RESIZE_IMAGE_SIZE,
-                                           interpolation=cv2.INTER_CUBIC,
-                                           p=1.0))
                 if 'verticalflip' in self.augment:
                     aug_list.append(VerticalFlip(p=0.5))
                 if 'horizontalflip' in self.augment:
@@ -178,15 +179,24 @@ class CellularImageDataset(Dataset):
                 )
                 """
 
-            #  if not visualize:
-            if 'normalize' in self.augment:
-                aug_list.append(
-                    Normalize(
-                        p=1.0,
-                        mean=[0.485, 0.456, 0.406, 0.485, 0.456, 0.406],
-                        std=[0.229, 0.224, 0.225, 0.229, 0.224, 0.225]
-                    )  # rgb -> 6 channels
-                )  # based on imagenet
+#             #  if not visualize:
+#             if 'normalize' in self.augment:
+#                 experiment, plate, well = id_code.split('_')
+#                 norm_df = self.stats_df.query(
+#                         f'experiment == "{experiment}" and '
+#                         f'plate == {int(plate)} and '
+#                         f'well == "{well}" and '
+#                         f'site == {int(site)}'
+#                 ).sort_values('channel')
+#                 aug_list.append(
+#                     Normalize(
+#                         p=1.0,
+#                         mean=norm_df['mean'].tolist(),
+#                         std=norm_df['std'].tolist(),
+#                         # mean=[0.485, 0.456, 0.406, 0.485, 0.456, 0.406],
+#                         # std=[0.229, 0.224, 0.225, 0.229, 0.224, 0.225]
+#                     )  # rgb -> 6 channels
+#                 )  # based on imagenet
 
             return Compose(aug_list, p=1.0)
 
@@ -221,12 +231,25 @@ class CellularImageDataset(Dataset):
             return img
         # -------
 
+#        if self.dlt_bias:
+#            means, stds = [], []
+#            for i in range(6):
+#                _img = img[:, :, i]
+#                means.append(_img.mean())
+#                stds.append(_img.std())
+#            img = Normalize(mean=means, std=stds).apply(img)
         img = _albumentations(self.mode, self.visualize)(image=img)["image"]
 #        if (
 #            self.mode == "train"
 #            and np.random.uniform() >= 0.5  # 50%
 #        ):
 #            img = _cutout(img)
+        if 'normalize' in self.augment:
+            means = []
+            for i in range(6):
+                _img = img[:, :, i]
+                means.append(_img.mean())
+            img = img - means
 
         return img
 

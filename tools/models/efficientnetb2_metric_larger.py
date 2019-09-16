@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torchvision
+from efficientnet_pytorch import EfficientNet
 
 from ..metrics import ArcMarginProduct
 from ..layers import myIdentity
@@ -9,23 +9,20 @@ from ..layers import myIdentity
 class Network(nn.Module):
     def __init__(self, pretrained, n_classes):
         super(Network, self).__init__()
-        self.model = torchvision.models.densenet201(pretrained=pretrained)
+        self.model = EfficientNet.from_pretrained(
+            'efficientnet-b2', num_classes=n_classes)
 
-        # Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
         new_conv = nn.Conv2d(
             6,
-            64,
-            kernel_size=(7, 7),
-            stride=(2, 2),
-            padding=(3, 3),
+            32,
+            kernel_size=5,
+            stride=3,
+            padding=3,
             bias=False)
-        with torch.no_grad():
-            new_conv.weight[:, :] = torch.stack(
-                [torch.mean(self.model.features.conv0.weight, 1)] * 6, dim=1)
-        self.model.features.conv0 = new_conv
-        self.model.classifier = myIdentity(in_features=self.model.classifier.in_features)
+        self.model._conv_stem = new_conv
+        self.model._fc = myIdentity(in_features=self.model._fc.in_features)
         self.arc = ArcMarginProduct(
-            in_features=self.model.classifier.in_features,
+            in_features=self.model._fc.in_features,
             out_features=n_classes,
             easy_margin=True,
         ).to('cuda')
@@ -44,9 +41,11 @@ class Network(nn.Module):
 
     def named_children(self):
         for name, module in self.model.named_children():
-            if name == 'classifier':
-                name = 'fc'
             yield name, module
+
+#    def to(self, device):
+#        super().to(device)
+#        self.arc.to(device)
 
     def _init_weight(self):
         for m in self.modules():

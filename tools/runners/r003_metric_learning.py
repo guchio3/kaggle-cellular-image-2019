@@ -17,24 +17,13 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from ..datasets import CellularImageDataset, ImagesDS
-from ..models import (efficientnetb2, efficientnetb2_metric, efficientnetb4,
-                      efficientnetb5, efficientnetb7, resnet18, densenet201_metric)
+from ..models import (densenet201_metric, efficientnetb2,
+                      efficientnetb2_metric, efficientnetb2_metric_bn,
+                      efficientnetb4, efficientnetb5, efficientnetb7, resnet18)
 from ..schedulers import CosineAnnealingWarmUpRestarts as cawur
 from ..schedulers import pass_scheduler
 from ..utils.logs import sel_log, send_line_notification
 from ..utils.splittings import CellwiseStratifiedKFold as cskf
-
-
-def seed_everything(seed):
-    random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True
-
-
-seed_everything(71)
 
 
 class Runner(object):
@@ -63,6 +52,14 @@ class Runner(object):
             self.augment = config['augment']
         else:
             self.augment = []
+        if 'dlt_bias' in config:
+            self.dlt_bias = config['dlt_bias']
+        else:
+            self.dlt_bias = False
+        if 'dlt_var' in config:
+            self.dlt_var = config['dlt_var']
+        else:
+            self.dlt_bias = False
         self.metric = True if 'metric' in config['model']['model_type'] else False
         self.logger = logger
         self.histories = {
@@ -72,7 +69,8 @@ class Runner(object):
         }
         self.base_weight = args.base_weight
         if args.base_weight:
-            self.model
+            if args.base_weight == 'best_all':
+                args.bese_weight = self._search_best_filename('ALL')
             checkpoint = torch.load(args.base_weight)
             self.model.load_state_dict(checkpoint['model_state_dict'])
 
@@ -96,6 +94,8 @@ class Runner(object):
             model = efficientnetb7.Network(pretrained, 1108)
         elif model_type == 'efficientnetb2_metric':
             model = efficientnetb2_metric.Network(pretrained, 1108)
+        elif model_type == 'efficientnetb2_metric_bn':
+            model = efficientnetb2_metric_bn.Network(pretrained, 1108)
         elif model_type == 'densenet201_metric':
             model = densenet201_metric.Network(pretrained, 1108)
         else:
@@ -178,14 +178,15 @@ class Runner(object):
                 )
             else:
                 raise Exception(f'invalid sampler_type: {sampler_type}')
-        else:  # valid, test
+        else:  # test
             sampler = torch.utils.data.sampler.SequentialSampler(
                 data_source=dataset)
             # data_source=dataset.image_files)
         return sampler
 
     def _build_loader(self, mode, ids, augment, batch_size=None):
-        dataset = CellularImageDataset(mode, ids, augment)
+        dataset = CellularImageDataset(
+            mode, ids, augment, self.dlt_bias, self.dlt_var)
         # dataset = ImagesDS(ids, './mnt/inputs/', mode)
         sampler = self._get_sampler(dataset, mode, self.sampler_type)
         drop_last = True if mode == 'train' else False
@@ -287,11 +288,6 @@ class Runner(object):
                     self.device, dtype=torch.float), labels.to(
                     self.device)
                 outputs = self.model.forward(images)
-                # avg predictions
-                # outputs = torch.mean(outputs.reshape((-1, 1108, 2)), 2)
-                # outputs = torch.mean(torch.stack(
-                #     [outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
-                # _, predicted = torch.max(outputs.data, 1)
                 sm_outputs = softmax(outputs, dim=1)
                 sm_outputs = torch.mean(torch.stack(
                     [sm_outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
@@ -403,7 +399,7 @@ class Runner(object):
         if epoch == 1:
             # for name, child in self.model.named_children():
             for name, child in self.model.module.named_children():
-                if 'fc' in name or 'arc' in name:
+                if 'fc' in name or 'arc' in name or 'bn00' in name:
                     sel_log(name + ' is unfrozen', self.logger)
                     for param in child.parameters():
                         param.requires_grad = True
