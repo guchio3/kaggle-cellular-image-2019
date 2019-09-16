@@ -249,6 +249,7 @@ class Runner(object):
                 images, labels = images.to(
                     self.device, dtype=torch.float), labels.to(
                     self.device)
+                images = images / 255
                 outputs = self.model.forward(images)
                 valid_loss = self.fobj(outputs, labels)
                 running_loss += valid_loss.item()
@@ -280,6 +281,7 @@ class Runner(object):
                 images, labels = images.to(
                     self.device, dtype=torch.float), labels.to(
                     self.device)
+                images = images / 255
                 outputs = self.model.forward(images)
                 sm_outputs = softmax(outputs, dim=1)
 #                sm_outputs = torch.mean(torch.stack(
