@@ -217,6 +217,7 @@ class Runner(object):
             images, labels = images.to(
                 self.device, dtype=torch.float), labels.to(
                 self.device)
+            images = images / 255
 
             if self.metric:
                 outputs = self.model.forward(images, labels)
