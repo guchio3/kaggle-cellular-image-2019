@@ -1,4 +1,4 @@
-description: scaled small lr
+description: experimental standarization
 runner: r004
 device: cuda
 batch_size: 32
@@ -7,13 +7,13 @@ fobj: ce
 dlt_bias: false
 dlt_var: false
 model:
-    model_type: efficientnetb2
+    model_type: efficientnetb2_metric
     pretrained: true
 optimizer: 
-    optim_type: adabound
+    optim_type: adam
     lr: 0.001
 scheduler:
-    scheduler_type: multistep
+    scheduler_type: cosine
 sampler:
     sampler_type: random
 split: 
@@ -22,3 +22,4 @@ split:
 augment:
     - horizontalflip
     - randomrotate90
+    - normalize

@@ -64,9 +64,11 @@ class CellularImageDataset(Dataset):
         else:  # train or valid
             labels = pd.read_csv('./mnt/inputs/origin/train.csv.zip')\
                 .set_index('id_code').loc[ids]['sirna'].values
-        self.ids, self.images, self.labels, self.sites = self._parse_ids(mode, ids, labels)
+        self.ids, self.images, self.labels, self.sites = self._parse_ids(
+            mode, ids, labels)
         self.stats_df = pd.read_csv('./mnt/inputs/origin/pixel_stats.csv.zip')
-        self.agg_stats_df = stats_df.groupby('experiment').aggregate({'mean': ['mean'], 'std': ['mean']})
+        self.agg_stats_df = self.stats_df.groupby(['experiment', 'channel']).aggregate({
+            'mean': ['mean'], 'std': ['mean']})
 
         # load validation
         assert len(self.images) == len(self.labels)
@@ -253,8 +255,8 @@ class CellularImageDataset(Dataset):
 #            img = img - means
         if 'normalize' in self.augment:
             experiment = id_code.split('_')[0]
-            means = self.agg_stats_df['mean']['mean'].loc[experiment]
-            stds = self.agg_stats_df['std']['mean'].loc[experiment]
+            means = self.agg_stats_df['mean']['mean'].loc[experiment].tolist()
+            stds = self.agg_stats_df['std']['mean'].loc[experiment].tolist()
             img = Normalize(mean=means, std=stds).apply(img)
 
         return img
