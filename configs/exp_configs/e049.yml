@@ -1,7 +1,7 @@
 description: scaled small lr
 runner: r004
 device: cuda
-batch_size: 32
+batch_size: 64
 max_epoch: 50
 fobj: ce
 dlt_bias: false

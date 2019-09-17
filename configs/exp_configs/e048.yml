@@ -2,7 +2,7 @@ description: scaled small lr
 runner: r004
 device: cuda
 batch_size: 64
-max_epoch: 40
+max_epoch: 50
 fobj: ce
 dlt_bias: false
 dlt_var: false
@@ -15,7 +15,7 @@ optimizer:
 scheduler:
     scheduler_type: multistep
 sampler:
-    sampler_type: sequential
+    sampler_type: random
 split: 
     split_type: cskf
     split_num: 5

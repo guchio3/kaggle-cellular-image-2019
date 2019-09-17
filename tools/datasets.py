@@ -66,6 +66,7 @@ class CellularImageDataset(Dataset):
                 .set_index('id_code').loc[ids]['sirna'].values
         self.ids, self.images, self.labels, self.sites = self._parse_ids(mode, ids, labels)
         self.stats_df = pd.read_csv('./mnt/inputs/origin/pixel_stats.csv.zip')
+        self.agg_stats_df = stats_df.groupby('experiment').aggregate({'mean': ['mean'], 'std': ['mean']})
 
         # load validation
         assert len(self.images) == len(self.labels)
@@ -244,12 +245,17 @@ class CellularImageDataset(Dataset):
 #            and np.random.uniform() >= 0.5  # 50%
 #        ):
 #            img = _cutout(img)
+#        if 'normalize' in self.augment:
+#            means = []
+#            for i in range(6):
+#                _img = img[:, :, i]
+#                means.append(_img.mean())
+#            img = img - means
         if 'normalize' in self.augment:
-            means = []
-            for i in range(6):
-                _img = img[:, :, i]
-                means.append(_img.mean())
-            img = img - means
+            experiment = id_code.split('_')[0]
+            means = self.agg_stats_df['mean']['mean'].loc[experiment]
+            stds = self.agg_stats_df['std']['mean'].loc[experiment]
+            img = Normalize(mean=means, std=stds).apply(img)
 
         return img
 
