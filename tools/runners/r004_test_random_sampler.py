@@ -140,7 +140,7 @@ class Runner(object):
             scheduler = optim.lr_scheduler.MultiStepLR(
                 self.optimizer,
                 milestones=[
-                    int(max_epoch * 0.8),
+                    int(max_epoch * 0.5),
                     int(max_epoch * 0.9)
                 ],
                 gamma=0.1
@@ -417,7 +417,7 @@ class Runner(object):
                     sel_log(name + ' is frozen', self.logger)
                     for param in child.parameters():
                         param.requires_grad = False
-        if epoch == 3:
+        if epoch == 5:
             sel_log("Turn on all the layers", self.logger)
             for name, child in self.model.named_children():
                 for param in child.parameters():
