@@ -417,7 +417,7 @@ class Runner(object):
                     sel_log(name + ' is frozen', self.logger)
                     for param in child.parameters():
                         param.requires_grad = False
-        if epoch == 3:
+        if epoch == 5:
             sel_log("Turn on all the layers", self.logger)
             for name, child in self.model.named_children():
                 for param in child.parameters():
