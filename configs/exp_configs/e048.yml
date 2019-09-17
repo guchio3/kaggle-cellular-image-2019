@@ -15,7 +15,7 @@ optimizer:
 scheduler:
     scheduler_type: multistep
 sampler:
-    sampler_type: sequential
+    sampler_type: random
 split: 
     split_type: cskf
     split_num: 5
