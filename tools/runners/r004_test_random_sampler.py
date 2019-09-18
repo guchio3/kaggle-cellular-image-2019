@@ -447,8 +447,9 @@ class Runner(object):
 
         train_loader = self._build_loader(
             mode="train", ids=trn_ids, augment=self.augment)
+        augment = [] if 'normalize' not in self.augment else ['normalize']
         valid_loader = self._build_loader(
-            mode="train", ids=val_ids, augment=[])
+            mode="train", ids=val_ids, augment=augment)
 
         # load and apply checkpoint if needed
         if self.checkpoint:
@@ -493,8 +494,9 @@ class Runner(object):
         tst_ids = self._get_test_ids(cell_type)
         if self.debug:
             tst_ids = tst_ids[:300]
+        augment = [] if 'normalize' not in self.augment else ['normalize']
         test_loader = self._build_loader(
-            mode="test", ids=tst_ids, augment=[], batch_size=int(self.batch_size*4))
+            mode="test", ids=tst_ids, augment=augment, batch_size=self.batch_size)
         best_loss, best_acc = self._load_best_model(cell_type)
         test_ids, test_preds = self._test_loop(test_loader)
 
