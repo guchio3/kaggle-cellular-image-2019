@@ -258,6 +258,10 @@ class CellularImageDataset(Dataset):
             means = self.agg_stats_df['mean']['mean'].loc[experiment].tolist()
             stds = self.agg_stats_df['std']['mean'].loc[experiment].tolist()
             img = Normalize(mean=means, std=stds).apply(img)
+        if 'mean_avg' in self.augment:
+            experiment = id_code.split('_')[0]
+            means = self.agg_stats_df['mean']['mean'].loc[experiment].values
+            img = img / means
 
         return img
 
