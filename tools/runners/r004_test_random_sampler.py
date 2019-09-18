@@ -419,7 +419,7 @@ class Runner(object):
     def _warmup_setting(self, epoch):
         if self.base_weight:
             return
-        if epoch == 1:
+        if epoch < 3:
             # for name, child in self.model.named_children():
             for name, child in self.model.module.named_children():
                 if 'fc' in name or 'arc' in name or '_conv_stem' in name or 'bn00' in name:
@@ -430,7 +430,7 @@ class Runner(object):
                     sel_log(name + ' is frozen', self.logger)
                     for param in child.parameters():
                         param.requires_grad = False
-        if epoch == 5:
+        elif epoch == 3:
             sel_log("Turn on all the layers", self.logger)
             for name, child in self.model.named_children():
                 for param in child.parameters():
