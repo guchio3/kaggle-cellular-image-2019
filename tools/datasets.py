@@ -95,10 +95,17 @@ class CellularImageDataset(Dataset):
             assert img.shape == (6, IMAGE_SIZE, IMAGE_SIZE)
 
         experiment = id_code.split('_')[0]
-        means = torch.tensor(self.agg_stats_df['mean']['mean'].loc[experiment].values)
-#        means = (means / 255.).tolist()
-        stds = torch.tensor(self.agg_stats_df['std']['mean'].loc[experiment].values)
-#        stds = (stds / 255.).tolist()
+        if 'normalize'in self.augment:
+            means = torch.tensor(self.stats_df.query(f'id_code == "{id_code}" and site == {site}')['mean'].values)
+            stds = torch.tensor(self.stats_df.query(f'id_code == "{id_code}" and site == {site}')['std'].values)
+        elif 'normalize_exp':
+            means = torch.tensor(self.agg_stats_df['mean']['mean'].loc[experiment].values)
+    #        means = (means / 255.).tolist()
+            stds = torch.tensor(self.agg_stats_df['std']['mean'].loc[experiment].values)
+    #        stds = (stds / 255.).tolist()
+        else:
+            means = None
+            stds = None
 
         return (self.ids[idx], torch.tensor(img),
                 torch.tensor(self.labels[idx]), means, stds)
