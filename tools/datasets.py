@@ -94,8 +94,21 @@ class CellularImageDataset(Dataset):
         else:
             assert img.shape == (6, IMAGE_SIZE, IMAGE_SIZE)
 
+        experiment = id_code.split('_')[0]
+        if 'normalize'in self.augment:
+            means = torch.tensor(self.stats_df.query(f'id_code == "{id_code}" and site == {site}')['mean'].values)
+            stds = torch.tensor(self.stats_df.query(f'id_code == "{id_code}" and site == {site}')['std'].values)
+        elif 'normalize_exp':
+            means = torch.tensor(self.agg_stats_df['mean']['mean'].loc[experiment].values)
+    #        means = (means / 255.).tolist()
+            stds = torch.tensor(self.agg_stats_df['std']['mean'].loc[experiment].values)
+    #        stds = (stds / 255.).tolist()
+        else:
+            means = None
+            stds = None
+
         return (self.ids[idx], torch.tensor(img),
-                torch.tensor(self.labels[idx]))
+                torch.tensor(self.labels[idx]), means, stds)
 
     def reset_ids(self, ids):
         self.len = len(ids)
@@ -253,17 +266,18 @@ class CellularImageDataset(Dataset):
 #                _img = img[:, :, i]
 #                means.append(_img.mean())
 #            img = img - means
-        if 'normalize' in self.augment:
-            experiment = id_code.split('_')[0]
-            means = self.agg_stats_df['mean']['mean'].loc[experiment]
-            means = (means / 255.).tolist()
-            stds = self.agg_stats_df['std']['mean'].loc[experiment]
-            stds = (stds / 255.).tolist()
-            img = Normalize(mean=means, std=stds).apply(img)
-        if 'mean_avg' in self.augment:
-            experiment = id_code.split('_')[0]
-            means = self.agg_stats_df['mean']['mean'].loc[experiment].values
-            img = img / means
+
+#         if 'normalize' in self.augment:
+#             experiment = id_code.split('_')[0]
+#             means = self.agg_stats_df['mean']['mean'].loc[experiment]
+#             means = (means / 255.).tolist()
+#             stds = self.agg_stats_df['std']['mean'].loc[experiment]
+#             stds = (stds / 255.).tolist()
+#             img = Normalize(mean=means, std=stds).apply(img)
+#         if 'mean_avg' in self.augment:
+#             experiment = id_code.split('_')[0]
+#             means = self.agg_stats_df['mean']['mean'].loc[experiment].values
+#             img = img / means
 
         return img
 

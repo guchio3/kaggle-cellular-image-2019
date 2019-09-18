@@ -10,18 +10,18 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from adabound import AdaBound
 from sklearn.model_selection import GroupKFold as gkf
 from sklearn.model_selection import StratifiedKFold as skf
 from torch.nn.functional import softmax
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from adabound import AdaBound
-
 from ..datasets import CellularImageDataset, ImagesDS
 from ..models import (densenet121_metric, densenet201_metric, efficientnetb2,
-                      efficientnetb2_metric, efficientnetb2_metric_bn, efficientnetb2_metric_larger,
-                      efficientnetb4, efficientnetb5, efficientnetb7, resnet18)
+                      efficientnetb2_metric, efficientnetb2_metric_bn,
+                      efficientnetb2_metric_larger, efficientnetb4,
+                      efficientnetb5, efficientnetb7, resnet18)
 from ..schedulers import CosineAnnealingWarmUpRestarts as cawur
 from ..schedulers import pass_scheduler
 from ..utils.logs import sel_log, send_line_notification
@@ -235,10 +235,21 @@ class Runner(object):
         self.model.train()
         running_loss = 0
 
-        for (ids, images, labels) in tqdm(loader):
+        for (ids, images, labels, means, stds) in tqdm(loader):
             images, labels = images.to(
                 self.device, dtype=torch.float), labels.to(
                 self.device)
+            if 'normalize' in self.augment:
+                means = means.to(self.device, dtype=torch.float)
+                means = means.reshape(
+                    self.batch_size, 6, 1, 1).expand(
+                    self.batch_size, 6, 512, 512)
+                stds = stds.to(self.device, dtype=torch.float)
+                stds = stds.reshape(
+                    self.batch_size, 6, 1, 1).expand(
+                    self.batch_size, 6, 512, 512)
+                images -= means
+                images /= stds
 
             if self.metric:
                 outputs = self.model.forward(images, labels)
@@ -266,10 +277,22 @@ class Runner(object):
 
         with torch.no_grad():
             valid_preds, valid_labels = [], []
-            for (ids, images, labels) in tqdm(loader):
+            for (ids, images, labels, means, stds) in tqdm(loader):
                 images, labels = images.to(
                     self.device, dtype=torch.float), labels.to(
                     self.device)
+                if 'normalize' in self.augment:
+                    means = means.to(self.device, dtype=torch.float)
+                    means = means.reshape(
+                        self.batch_size, 6, 1, 1).expand(
+                        self.batch_size, 6, 512, 512)
+                    stds = stds.to(self.device, dtype=torch.float)
+                    stds = stds.reshape(
+                        self.batch_size, 6, 1, 1).expand(
+                        self.batch_size, 6, 512, 512)
+                    images -= means
+                    images /= stds
+
                 outputs = self.model.forward(images)
                 valid_loss = self.fobj(outputs, labels)
                 running_loss += valid_loss.item()
@@ -297,10 +320,22 @@ class Runner(object):
 
         sel_log('predicting ...', self.logger)
         with torch.no_grad():
-            for (ids, images, labels) in tqdm(loader):
+            for (ids, images, labels, means, stds) in tqdm(loader):
                 images, labels = images.to(
                     self.device, dtype=torch.float), labels.to(
                     self.device)
+                if 'normalize' in self.augment:
+                    means = means.to(self.device, dtype=torch.float)
+                    means = means.reshape(
+                        self.batch_size, 6, 1, 1).expand(
+                        self.batch_size, 6, 512, 512)
+                    stds = stds.to(self.device, dtype=torch.float)
+                    stds = stds.reshape(
+                        self.batch_size, 6, 1, 1).expand(
+                        self.batch_size, 6, 512, 512)
+                    images -= means
+                    images /= stds
+
                 outputs = self.model.forward(images)
                 sm_outputs = softmax(outputs, dim=1)
 #                sm_outputs = torch.mean(torch.stack(

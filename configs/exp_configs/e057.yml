@@ -1,22 +1,17 @@
-description: efficientnet
+description: experimental standarization
 runner: r004
 device: cuda
 batch_size: 32
-max_epoch: 50
+max_epoch: 40
 fobj: ce
 dlt_bias: false
 dlt_var: false
 model:
-    model_type: densenet121_metric
+    model_type: efficientnetb2_metric
     pretrained: true
 optimizer: 
-<<<<<<< HEAD
     optim_type: adam
-    lr: 0.0001
-=======
-    optim_type: rmsprop
-    lr: 0.1
->>>>>>> efdd482551a4eeecf2584eeec0dce76efe31bc9f
+    lr: 0.001
 scheduler:
     scheduler_type: cosine
 sampler:
@@ -27,3 +22,4 @@ split:
 augment:
     - horizontalflip
     - randomrotate90
+    - normalize

@@ -1,4 +1,4 @@
-description: experimental standarization
+d_expescription: experimental standarization
 runner: r004
 device: cuda
 batch_size: 32
@@ -22,4 +22,4 @@ split:
 augment:
     - horizontalflip
     - randomrotate90
-    - normalize
+    - normalize_exp
