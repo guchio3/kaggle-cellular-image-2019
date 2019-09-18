@@ -120,6 +120,7 @@ class Runner(object):
                 model.parameters(),
                 lr=lr,
                 momentum=0.9,
+                weight_decay=0.9,
             )
         elif optim_type == 'adabound':
             optimizer = AdaBound(
@@ -145,6 +146,12 @@ class Runner(object):
     def _get_scheduler(self, scheduler_type, max_epoch):
         if scheduler_type == 'pass':
             scheduler = pass_scheduler()
+        elif scheduler_type == 'step':
+            scheduler = optim.lr_scheduler.StepLR(
+                self.optimizer,
+                step_size=2,
+                gamma=0.9,
+            )
         elif scheduler_type == 'multistep':
             scheduler = optim.lr_scheduler.MultiStepLR(
                 self.optimizer,
@@ -232,7 +239,6 @@ class Runner(object):
             images, labels = images.to(
                 self.device, dtype=torch.float), labels.to(
                 self.device)
-            images = images / 255
 
             if self.metric:
                 outputs = self.model.forward(images, labels)
@@ -264,7 +270,6 @@ class Runner(object):
                 images, labels = images.to(
                     self.device, dtype=torch.float), labels.to(
                     self.device)
-                images = images / 255
                 outputs = self.model.forward(images)
                 valid_loss = self.fobj(outputs, labels)
                 running_loss += valid_loss.item()
@@ -296,7 +301,6 @@ class Runner(object):
                 images, labels = images.to(
                     self.device, dtype=torch.float), labels.to(
                     self.device)
-                images = images / 255
                 outputs = self.model.forward(images)
                 sm_outputs = softmax(outputs, dim=1)
 #                sm_outputs = torch.mean(torch.stack(
@@ -443,8 +447,9 @@ class Runner(object):
 
         train_loader = self._build_loader(
             mode="train", ids=trn_ids, augment=self.augment)
+        augment = [] if 'normalize' not in self.augment else ['normalize']
         valid_loader = self._build_loader(
-            mode="train", ids=val_ids, augment=[])
+            mode="train", ids=val_ids, augment=augment)
 
         # load and apply checkpoint if needed
         if self.checkpoint:
@@ -489,8 +494,9 @@ class Runner(object):
         tst_ids = self._get_test_ids(cell_type)
         if self.debug:
             tst_ids = tst_ids[:300]
+        augment = [] if 'normalize' not in self.augment else ['normalize']
         test_loader = self._build_loader(
-            mode="test", ids=tst_ids, augment=[], batch_size=int(self.batch_size*4))
+            mode="test", ids=tst_ids, augment=augment, batch_size=self.batch_size)
         best_loss, best_acc = self._load_best_model(cell_type)
         test_ids, test_preds = self._test_loop(test_loader)
 

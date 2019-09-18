@@ -1,4 +1,4 @@
-description: experimental standarization
+description: efficientnet
 runner: r004
 device: cuda
 batch_size: 32
