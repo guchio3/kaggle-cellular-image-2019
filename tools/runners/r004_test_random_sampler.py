@@ -16,6 +16,8 @@ from torch.nn.functional import softmax
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from adabound import AdaBound
+
 from ..datasets import CellularImageDataset, ImagesDS
 from ..models import (densenet201_metric, efficientnetb2,
                       efficientnetb2_metric, efficientnetb2_metric_bn, efficientnetb2_metric_larger,
@@ -116,6 +118,11 @@ class Runner(object):
                 model.parameters(),
                 lr=lr,
                 momentum=0.9,
+            )
+        elif optim_type == 'adabound':
+            optimizer = AdaBound(
+                model.parameters(),
+                lr=lr,
             )
         else:
             raise Exception(f'invalid optim_type: {optim_type}')
