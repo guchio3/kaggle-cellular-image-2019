@@ -22,4 +22,4 @@ split:
 augment:
     - horizontalflip
     - randomrotate90
-    - normalize
+    - normalize_exp

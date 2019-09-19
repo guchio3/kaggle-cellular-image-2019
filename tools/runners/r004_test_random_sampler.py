@@ -482,7 +482,12 @@ class Runner(object):
 
         train_loader = self._build_loader(
             mode="train", ids=trn_ids, augment=self.augment)
-        augment = [] if 'normalize' not in self.augment else ['normalize']
+        if 'normalize' in self.augment:
+            augment = ['normalize']
+        elif 'normalize_exp' in self.augment:
+            augment = ['normalize_exp']
+        else:
+            augment = []
         valid_loader = self._build_loader(
             mode="train", ids=val_ids, augment=augment)
 
@@ -529,7 +534,12 @@ class Runner(object):
         tst_ids = self._get_test_ids(cell_type)
         if self.debug:
             tst_ids = tst_ids[:300]
-        augment = [] if 'normalize' not in self.augment else ['normalize']
+        if 'normalize' in self.augment:
+            augment = ['normalize']
+        elif 'normalize_exp' in self.augment:
+            augment = ['normalize_exp']
+        else:
+            augment = []
         test_loader = self._build_loader(
             mode="test", ids=tst_ids, augment=augment, batch_size=self.batch_size)
         best_loss, best_acc = self._load_best_model(cell_type)

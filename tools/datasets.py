@@ -43,7 +43,8 @@ def _load_imgs_from_ids(id_pair, mode):
 #        images.append(
 #            np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6))
         res_id_pairs.append(
-            [_id, np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6), label, site])
+            [_id, np.array(_images).transpose(1, 2, 0), label, site])
+        #    [_id, np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6), label, site])
     return res_id_pairs
 
 
