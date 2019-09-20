@@ -3,7 +3,7 @@ import time
 from logging import DEBUG, FileHandler, Formatter, StreamHandler
 
 import requests
-from lightgbm.callback import _format_eval_result
+#from lightgbm.callback import _format_eval_result
 
 
 # ==========================================

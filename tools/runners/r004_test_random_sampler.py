@@ -43,6 +43,10 @@ class Runner(object):
         self.batch_size = config['batch_size']
         self.max_epoch = config['max_epoch']
         self.fobj = self._get_fobj(config['fobj'])
+        if 'easy_margin' in config['model']:
+            self.easy_margin = config['model']['easy_margin']
+        else:
+            self.easy_margin = True
         self.model, self.optimizer = self._build_model(
             config['model'], config['optimizer'])
         self.scheduler = self._get_scheduler(
@@ -87,7 +91,7 @@ class Runner(object):
         elif model_type == 'efficientnetb7':
             model = efficientnetb7.Network(pretrained, 1108)
         elif model_type == 'efficientnetb2_metric':
-            model = efficientnetb2_metric.Network(pretrained, 1108)
+            model = efficientnetb2_metric.Network(pretrained, 1108, self.easy_margin)
         elif model_type == 'efficientnetb2_metric_bn':
             model = efficientnetb2_metric_bn.Network(pretrained, 1108)
         elif model_type == 'efficientnetb2_metric_larger':
@@ -213,8 +217,8 @@ class Runner(object):
             dataset,
             batch_size=batch_size,
             sampler=sampler,
-            # num_workers=cpu_count(),
-            num_workers=0,
+            num_workers=os.cpu_count(),
+            # num_workers=0,
             worker_init_fn=lambda x: np.random.seed(),
             drop_last=drop_last,
             pin_memory=True,

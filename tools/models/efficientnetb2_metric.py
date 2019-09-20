@@ -7,7 +7,7 @@ from ..layers import myIdentity
 
 
 class Network(nn.Module):
-    def __init__(self, pretrained, n_classes):
+    def __init__(self, pretrained, n_classes, easy_margin=True):
         super(Network, self).__init__()
         self.model = EfficientNet.from_pretrained(
             'efficientnet-b2', num_classes=n_classes)
@@ -27,7 +27,7 @@ class Network(nn.Module):
         self.arc = ArcMarginProduct(
             in_features=self.model._fc.in_features,
             out_features=n_classes,
-            easy_margin=True,
+            easy_margin=easy_margin,
         ).to('cuda')
 
         # weight initialization
