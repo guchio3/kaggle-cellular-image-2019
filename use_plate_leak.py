@@ -9,8 +9,8 @@ if __name__ == '__main__':
     args = parse_plate_args(None)
     train_df = pd.read_csv('./mnt/inputs/origin/train.csv.zip')
     test_df = pd.read_csv('./mnt/inputs/origin/test.csv')
-    sub = pd.read_csv('./mnt/inputs/origin/sample_submission.csv')
-    pred_df = pd.read_pickle(args.original_file)
+    sub = pd.read_csv(args.original_sub)
+    pred_df = pd.read_pickle(args.original_raw)
 
     # train part
     plate_groups = np.zeros((1108, 4), int)
@@ -63,7 +63,7 @@ if __name__ == '__main__':
         sub.loc[indices, 'sirna'] = preds.argmax(1)
 
     sub.to_csv(
-        args.original_file.replace(
+        args.original_raw.replace(
             '_raw',
             '_plate_leak').replace(
             'pkl',

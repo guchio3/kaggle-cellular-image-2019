@@ -60,7 +60,11 @@ def parse_plate_args(logger=None):
         description='short explanation of args',
         add_help=True,
     )
-    parser.add_argument('-o', '--original_file',
+    parser.add_argument('-s', '--original_sub',
+                        help='the original file to which plate leak is applied.',
+                        type=str,
+                        required=True)
+    parser.add_argument('-r', '--original_raw',
                         help='the original file to which plate leak is applied.',
                         type=str,
                         required=True)
