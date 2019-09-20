@@ -224,6 +224,9 @@ class CellularImageDataset(Dataset):
                 int(np.mean(img[:, :, 0])),
                 int(np.mean(img[:, :, 1])),
                 int(np.mean(img[:, :, 2])),
+                int(np.mean(img[:, :, 3])),
+                int(np.mean(img[:, :, 4])),
+                int(np.mean(img[:, :, 5])),
             ]
 
             mask_size_v = int(IMAGE_SIZE * np.random.randint(10, 60) * 0.01)
@@ -257,11 +260,12 @@ class CellularImageDataset(Dataset):
 #                stds.append(_img.std())
 #            img = Normalize(mean=means, std=stds).apply(img)
         img = _albumentations(self.mode, self.visualize)(image=img)["image"]
-#        if (
-#            self.mode == "train"
-#            and np.random.uniform() >= 0.5  # 50%
-#        ):
-#            img = _cutout(img)
+        if (
+            self.mode == "train"
+            and 'cutout' in self.augment
+            and np.random.uniform() >= 0.5  # 50%
+        ):
+            img = _cutout(img)
 #        if 'normalize' in self.augment:
 #            means = []
 #            for i in range(6):

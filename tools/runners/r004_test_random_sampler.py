@@ -565,8 +565,8 @@ class Runner(object):
 
         if sub_filename:
             submission_df = pd.read_csv(sub_filename)
-            sub_raw_filename = sub_filename.replace('_sub', '_sub_raw')
-            submission_raw_df = pd.read_csv(sub_raw_filename)
+            sub_raw_filename = sub_filename.replace('_sub', '_sub_raw').replace('.csv', '.pkl')
+            submission_raw_df = pd.read_pickle(sub_raw_filename)
         else:
             submission_df = pd.read_csv(
                 './mnt/inputs/origin/sample_submission.csv')
@@ -584,9 +584,9 @@ class Runner(object):
             filename_base = f'{self.exp_id}_{self.exp_time}_' \
                 f'{best_loss:.5f}_{best_acc:.5f}'
             sub_filename = f'./mnt/submissions/{filename_base}_sub.csv'
-            sub_raw_filename = f'./mnt/submissions/{filename_base}_sub_raw.csv'
+            sub_raw_filename = f'./mnt/submissions/{filename_base}_sub_raw.pkl'
         submission_df.to_csv(sub_filename, index=False)
-        submission_raw_df.to_csv(sub_raw_filename, index=False)
+        submission_raw_df.to_pickle(sub_raw_filename)
 
         sel_log(f'Saved submission file to {sub_filename} !', self.logger)
         return sub_filename
