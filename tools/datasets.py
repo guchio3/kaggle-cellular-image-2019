@@ -58,6 +58,7 @@ class CellularImageDataset(Dataset):
         self.visualize = visualize
         self.logger = logger
         self.augment = augment
+        self.tta = None
         self.len = None
 
         if mode == "test":
@@ -279,6 +280,28 @@ class CellularImageDataset(Dataset):
 #             experiment = id_code.split('_')[0]
 #             means = self.agg_stats_df['mean']['mean'].loc[experiment].values
 #             img = img / means
+        if self.tta:
+            if self.tta == 'original':
+                pass
+            elif self.tta == 'rotate90':
+                img = RandomRotate90(p=1.0).apply(img, factor=1)
+            elif self.tta == 'rotate180':
+                img = RandomRotate90(p=1.0).apply(img, factor=2)
+            elif self.tta == 'rotate270':
+                img = RandomRotate90(p=1.0).apply(img, factor=3)
+            elif self.tta == 'flip':
+                img = HorizontalFlip(p=1.0).apply(img)
+            elif self.tta == 'fliprotate90':
+                img = HorizontalFlip(p=1.0).apply(img)
+                img = RandomRotate90(p=1.0).apply(img, factor=1)
+            elif self.tta == 'fliprotate180':
+                img = HorizontalFlip(p=1.0).apply(img)
+                img = RandomRotate90(p=1.0).apply(img, factor=2)
+            elif self.tta == 'fliprotate270':
+                img = HorizontalFlip(p=1.0).apply(img)
+                img = RandomRotate90(p=1.0).apply(img, factor=3)
+            else:
+                raise Exception(f'invalid tta, {self.tta}')
 
         return img
 

@@ -55,6 +55,10 @@ class Runner(object):
             self.augment = config['augment']
         else:
             self.augment = []
+        if 'ttas' in config:
+            self.ttas = config['ttas']
+        else:
+            self.ttas = ['original', ]
         self.metric = True if 'metric' in config['model']['model_type'] else False
         self.logger = logger
         self.histories = {
@@ -313,7 +317,7 @@ class Runner(object):
 
         return valid_loss, valid_accuracy
 
-    def _test_loop(self, loader):
+    def _test_loop(self, loader, ttas):
         self.model.eval()
 
         test_ids = []
@@ -321,30 +325,33 @@ class Runner(object):
 
         sel_log('predicting ...', self.logger)
         with torch.no_grad():
-            for (ids, images, labels, means, stds) in tqdm(loader):
-                images, labels = images.to(
-                    self.device, dtype=torch.float), labels.to(
-                    self.device)
-                if 'normalize' in self.augment:
-                    means = means.to(self.device, dtype=torch.float)
-                    means = means.reshape(
-                        self.batch_size, 6, 1, 1).expand(
-                        self.batch_size, 6, 512, 512)
-                    stds = stds.to(self.device, dtype=torch.float)
-                    stds = stds.reshape(
-                        self.batch_size, 6, 1, 1).expand(
-                        self.batch_size, 6, 512, 512)
-                    images -= means
-                    images /= stds
+            for tta in ttas:
+                sel_log(f'tta: {tta}', self.logger)
+                loader.dataset.tta = tta
+                for (ids, images, labels, means, stds) in tqdm(loader):
+                    images, labels = images.to(
+                        self.device, dtype=torch.float), labels.to(
+                        self.device)
+                    if 'normalize' in self.augment:
+                        means = means.to(self.device, dtype=torch.float)
+                        means = means.reshape(
+                            self.batch_size, 6, 1, 1).expand(
+                            self.batch_size, 6, 512, 512)
+                        stds = stds.to(self.device, dtype=torch.float)
+                        stds = stds.reshape(
+                            self.batch_size, 6, 1, 1).expand(
+                            self.batch_size, 6, 512, 512)
+                        images -= means
+                        images /= stds
 
-                outputs = self.model.forward(images)
-                sm_outputs = softmax(outputs, dim=1)
-#                sm_outputs = torch.mean(torch.stack(
-#                    [sm_outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
-#                _, predicted = torch.max(sm_outputs.data, 1)
+                    outputs = self.model.forward(images)
+                    sm_outputs = softmax(outputs, dim=1)
+    #                sm_outputs = torch.mean(torch.stack(
+    #                    [sm_outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
+    #                _, predicted = torch.max(sm_outputs.data, 1)
 
-                test_ids.append(ids)
-                test_preds.append(sm_outputs.cpu())
+                    test_ids.append(ids)
+                    test_preds.append(sm_outputs.cpu())
 
             test_ids = np.concatenate(test_ids)
             test_preds = torch.cat(test_preds).numpy()
@@ -352,13 +359,16 @@ class Runner(object):
         res_df = pd.DataFrame([test_ids, test_preds]).T
         res_df.columns = ['test_id', 'y_pred']
         res_ids = []
+        res_raws = []
         res_preds = []
         for i, grp_df in res_df.groupby('test_id'):
             res_ids.append(i)
-            y_pred = np.argmax(np.mean(grp_df['y_pred'].values, axis=0))
+            res_raw = np.mean(grp_df['y_pred'].values, axis=0)
+            res_raws.append(res_raw)
+            y_pred = np.argmax(res_raw)
             res_preds.append(y_pred)
 
-        return res_ids, res_preds
+        return res_ids, res_preds, res_raws
 
     def _load_checkpoint(self, cp_filename):
         checkpoint = torch.load(cp_filename)
@@ -551,21 +561,32 @@ class Runner(object):
         test_loader = self._build_loader(
             mode="test", ids=tst_ids, augment=augment, batch_size=self.batch_size)
         best_loss, best_acc = self._load_best_model(cell_type)
-        test_ids, test_preds = self._test_loop(test_loader)
+        test_ids, test_preds, test_raw_preds = self._test_loop(test_loader, self.ttas)
 
         if sub_filename:
             submission_df = pd.read_csv(sub_filename)
+            sub_raw_filename = sub_filename.replace('_sub', '_sub_raw')
+            submission_raw_df = pd.read_csv(sub_raw_filename)
         else:
             submission_df = pd.read_csv(
                 './mnt/inputs/origin/sample_submission.csv')
+            submission_raw_df = pd.read_csv(
+                './mnt/inputs/origin/sample_submission.csv')
+            submission_raw_df = submission_raw_df.rename(columns={'sirna': 'raw_pred'})
+            submission_raw_df['raw_pred'] = None
         submission_df = submission_df.set_index('id_code')
         submission_df.loc[test_ids, 'sirna'] = test_preds
         submission_df = submission_df.reset_index()
+        submission_raw_df = submission_raw_df.set_index('id_code')
+        submission_raw_df.loc[test_ids, 'raw_pred'] = test_raw_preds
+        submission_raw_df = submission_raw_df.reset_index()
         if not sub_filename:
             filename_base = f'{self.exp_id}_{self.exp_time}_' \
                 f'{best_loss:.5f}_{best_acc:.5f}'
             sub_filename = f'./mnt/submissions/{filename_base}_sub.csv'
+            sub_raw_filename = f'./mnt/submissions/{filename_base}_sub_raw.csv'
         submission_df.to_csv(sub_filename, index=False)
+        submission_raw_df.to_csv(sub_raw_filename, index=False)
 
         sel_log(f'Saved submission file to {sub_filename} !', self.logger)
         return sub_filename
