@@ -1,7 +1,7 @@
-d_expescription: experimental standarization
+d_expescription: w/o normalization
 runner: r004
 device: cuda
-batch_size: 64
+batch_size: 32
 max_epoch: 40
 fobj: ce
 dlt_bias: false
@@ -22,4 +22,3 @@ split:
 augment:
     - horizontalflip
     - randomrotate90
-    - normalize_exp
