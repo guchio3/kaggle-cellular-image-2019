@@ -53,3 +53,16 @@ def CellwiseStratifiedKFold(
             fold[i][1] = np.concatenate(fold[i][1])
 
     return fold
+
+
+def ExperimentwiseSplit(
+        X_df, y, n_splits=5, shuffle=False, random_state=71):
+
+    X_df = X_df.reset_index(drop=True)
+    fold = [[[], []] for i in range(n_splits)]
+    is_val = X_df.experiment.isin(
+        set(['HEPG2-07', 'HUVEC-15', 'HUVEC-16', 'RPE-07', 'U2OS-03']))
+    fold[0][0] = X_df[~(is_val)].index.values
+    fold[0][1] = X_df[is_val].index.values
+
+    return fold
