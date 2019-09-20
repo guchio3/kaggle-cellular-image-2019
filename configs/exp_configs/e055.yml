@@ -1,7 +1,7 @@
 d_expescription: experimental standarization
 runner: r004
 device: cuda
-batch_size: 32
+batch_size: 64
 max_epoch: 40
 fobj: ce
 dlt_bias: false
