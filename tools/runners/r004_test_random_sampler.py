@@ -26,6 +26,7 @@ from ..schedulers import CosineAnnealingWarmUpRestarts as cawur
 from ..schedulers import pass_scheduler
 from ..utils.logs import sel_log, send_line_notification
 from ..utils.splittings import CellwiseStratifiedKFold as cskf
+from ..utils.splittings import ExperimentwiseSplit as ews
 
 
 class Runner(object):
@@ -423,6 +424,13 @@ class Runner(object):
                 .split(trn_df['id_code'], trn_df['sirna'])
         elif split_type == 'cskf':
             fold = cskf(
+                trn_df,
+                trn_df['sirna'],
+                split_num,
+                shuffle=True,
+                random_state=71)
+        elif split_type == 'ews':
+            fold = ews(
                 trn_df,
                 trn_df['sirna'],
                 split_num,
