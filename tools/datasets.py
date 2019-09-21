@@ -167,7 +167,7 @@ class CellularImageDataset(Dataset):
             sites.append(res_id_pair[3])
             plates.append(res_id_pair[4])
 
-        return ids, images, labels, sites
+        return ids, images, labels, sites, plates
 
     def _augmentation(self, img, label, id_code, site):
         # -------

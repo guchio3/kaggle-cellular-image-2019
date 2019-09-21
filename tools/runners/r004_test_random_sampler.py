@@ -268,13 +268,15 @@ class Runner(object):
                 images -= means
                 images /= stds
 
-            if self.metric:
+            if self.metric and 'mixup' in self.augment:
+                labels_dist = labels_dist.to(self.device, dtype=torch.float)
+                outputs = self.model.forward(images, labels_dist)
+            elif self.metric:
                 outputs = self.model.forward(images, labels)
             else:
                 outputs = self.model.forward(images)
 
             if 'mixup' in self.augment:
-                labels_dist = labels_dist.to(self.device, dtype=torch.float)
                 train_loss = self.fobj(outputs, labels_dist)
             else:
                 train_loss = self.fobj(outputs, labels)
@@ -315,7 +317,11 @@ class Runner(object):
                     images /= stds
 
                 outputs = self.model.forward(images)
-                valid_loss = self.fobj(outputs, labels)
+                if 'mixup' in self.augment:
+                    labels_dist = labels_dist.to(self.device, dtype=torch.float)
+                    valid_loss = self.fobj(outputs, labels_dist)
+                else:
+                    valid_loss = self.fobj(outputs, labels)
                 running_loss += valid_loss.item()
 
                 _, predicted = torch.max(outputs.data, 1)
