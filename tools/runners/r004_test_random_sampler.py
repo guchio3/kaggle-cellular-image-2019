@@ -256,7 +256,11 @@ class Runner(object):
             images, labels = images.to(
                 self.device, dtype=torch.float), labels.to(
                 self.device)
-            if 'normalize' in self.augment:
+            if (
+                    'normalize' in self.augment
+                    or 'normalize_exp' in self.augment
+                    or 'normalize_plate_exp' in self.augment
+            ):
                 means = means.to(self.device, dtype=torch.float)
                 means = means.reshape(
                     self.batch_size, 6, 1, 1).expand(
@@ -304,7 +308,11 @@ class Runner(object):
                 images, labels = images.to(
                     self.device, dtype=torch.float), labels.to(
                     self.device)
-                if 'normalize' in self.augment:
+                if (
+                        'normalize' in self.augment
+                        or 'normalize_exp' in self.augment
+                        or 'normalize_plate_exp' in self.augment
+                ):
                     means = means.to(self.device, dtype=torch.float)
                     means = means.reshape(
                         self.batch_size, 6, 1, 1).expand(
@@ -355,7 +363,11 @@ class Runner(object):
                     images, labels = images.to(
                         self.device, dtype=torch.float), labels.to(
                         self.device)
-                    if 'normalize' in self.augment:
+                    if (
+                            'normalize' in self.augment
+                            or 'normalize_exp' in self.augment
+                            or 'normalize_plate_exp' in self.augment
+                    ):
                         means = means.to(self.device, dtype=torch.float)
                         means = means.reshape(
                             self.batch_size, 6, 1, 1).expand(
