@@ -27,7 +27,7 @@ RESIZE_IMAGE_SIZE = 256
 
 
 def _load_imgs_from_ids(id_pair, mode):
-    _id, label = id_pair
+    _id, label, plate = id_pair
     split_id = _id.split('_')
     if mode == 'valid':
         mode = 'train'
@@ -43,7 +43,7 @@ def _load_imgs_from_ids(id_pair, mode):
 #        images.append(
 #            np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6))
         res_id_pairs.append(
-            [_id, np.array(_images).transpose(1, 2, 0), label, site])
+            [_id, np.array(_images).transpose(1, 2, 0), label, site, plate])
         #    [_id, np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6), label, site])
     return res_id_pairs
 
@@ -62,14 +62,19 @@ class CellularImageDataset(Dataset):
         self.len = None
 
         if mode == "test":
+            tst_df = pd.read_csv('./mnt/inputs/origin/train.csv.zip').set_index('id_code')
             labels = [0] * len(ids)
+            plates = tst_df.loc[ids]['plate'].values
         else:  # train or valid
-            labels = pd.read_csv('./mnt/inputs/origin/train.csv.zip')\
-                .set_index('id_code').loc[ids]['sirna'].values
-        self.ids, self.images, self.labels, self.sites = self._parse_ids(
-            mode, ids, labels)
+            trn_df = pd.read_csv('./mnt/inputs/origin/train.csv.zip').set_index('id_code')
+            labels = trn_df.loc[ids]['sirna'].values
+            plates = trn_df.loc[ids]['plate'].values
+        self.ids, self.images, self.labels, self.sites, self.plates = self._parse_ids(
+            mode, ids, labels, plates)
         self.stats_df = pd.read_csv('./mnt/inputs/origin/pixel_stats.csv.zip')
         self.agg_stats_df = self.stats_df.groupby(['experiment', 'channel']).aggregate({
+            'mean': ['mean'], 'std': ['mean']})
+        self.plate_agg_stats_df = self.stats_df.groupby(['experiment', 'plate', 'channel']).aggregate({
             'mean': ['mean'], 'std': ['mean']})
 
         # load validation
@@ -87,8 +92,10 @@ class CellularImageDataset(Dataset):
         img = self.images[idx]
         id_code = self.ids[idx]
         site = self.sites[idx]
+        plate = self.plates[idx]
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # RGB
-        img, label_dist = self._augmentation(img, self.labels[idx], id_code, site)
+        img, label_dist = self._augmentation(
+            img, self.labels[idx], id_code, site)
         img = img.transpose(2, 0, 1)  # (h, w, c) -> (c, h, w)
 
         if 'resize' in self.augment:
@@ -98,20 +105,29 @@ class CellularImageDataset(Dataset):
 
         experiment = id_code.split('_')[0]
         if 'normalize'in self.augment:
-            means = torch.tensor(self.stats_df.query(f'id_code == "{id_code}" and site == {site}')['mean'].values)
-            stds = torch.tensor(self.stats_df.query(f'id_code == "{id_code}" and site == {site}')['std'].values)
+            means = torch.tensor(self.stats_df.query(
+                f'id_code == "{id_code}" and site == {site}')['mean'].values)
+            stds = torch.tensor(self.stats_df.query(
+                f'id_code == "{id_code}" and site == {site}')['std'].values)
         elif 'normalize_exp':
-            means = torch.tensor(self.agg_stats_df['mean']['mean'].loc[experiment].values)
+            means = torch.tensor(
+                self.agg_stats_df['mean']['mean'].loc[experiment].values)
     #        means = (means / 255.).tolist()
-            stds = torch.tensor(self.agg_stats_df['std']['mean'].loc[experiment].values)
+            stds = torch.tensor(
+                self.agg_stats_df['std']['mean'].loc[experiment].values)
     #        stds = (stds / 255.).tolist()
+        elif 'normalize_plate_exp':
+            means = torch.tensor(
+                self.plate_agg_stats_df['mean']['mean'].loc[experiment].loc[plate].values)
+            stds = torch.tensor(
+                self.plate_agg_stats_df['std']['mean'].loc[experiment].loc[plate].values)
         else:
             means = None
             stds = None
 
         return (self.ids[idx], torch.tensor(img, dtype=torch.float),
                 torch.tensor(self.labels[idx]), torch.tensor(label_dist), means, stds)
-                # torch.tensor(self.labels[idx]), label_dist, means, stds)
+        # torch.tensor(self.labels[idx]), label_dist, means, stds)
 
     def reset_ids(self, ids):
         self.len = len(ids)
@@ -122,7 +138,7 @@ class CellularImageDataset(Dataset):
             .reset_index(drop=True)\
             .to_dict()
 
-    def _parse_ids(self, mode, ids, original_labels):
+    def _parse_ids(self, mode, ids, original_labels, plates):
         #        ids = ids[:300]
         #        original_labels = original_labels[:300]
         assert len(ids) == len(original_labels)
@@ -136,19 +152,20 @@ class CellularImageDataset(Dataset):
             iter_func = partial(
                 _load_imgs_from_ids,
                 mode=mode)
-            imap = p.imap_unordered(iter_func, list(zip(ids, original_labels)))
+            imap = p.imap_unordered(iter_func, list(zip(ids, original_labels, plates)))
             res_id_pairs = list(tqdm(imap, total=len(ids)))
             p.close()
             p.join()
             gc.collect()
         res_id_pairs = list(chain.from_iterable(res_id_pairs))
 
-        ids, images, labels, sites = [], [], [], []
+        ids, images, labels, sites, plates = [], [], [], [], []
         for res_id_pair in res_id_pairs:
             ids.append(res_id_pair[0])
             images.append(res_id_pair[1])
             labels.append(res_id_pair[2])
             sites.append(res_id_pair[3])
+            plates.append(res_id_pair[4])
 
         return ids, images, labels, sites
 
@@ -260,7 +277,7 @@ class CellularImageDataset(Dataset):
             self.mode == 'train'
             and 'mixup' in self.augment
             and np.random.uniform() >= 0.5
-           ):
+        ):
             img, label_dist = _mixup(img, label)
         elif self.mode == 'train':
             label_dist = np.eye(1108)[label]
