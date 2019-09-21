@@ -88,7 +88,7 @@ class CellularImageDataset(Dataset):
         id_code = self.ids[idx]
         site = self.sites[idx]
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # RGB
-        img = self._augmentation(img, self.labels[idx], id_code, site)
+        img, label_dist = self._augmentation(img, self.labels[idx], id_code, site)
         img = img.transpose(2, 0, 1)  # (h, w, c) -> (c, h, w)
 
         if 'resize' in self.augment:
@@ -109,8 +109,9 @@ class CellularImageDataset(Dataset):
             means = None
             stds = None
 
-        return (self.ids[idx], torch.tensor(img),
-                torch.tensor(self.labels[idx]), means, stds)
+        return (self.ids[idx], torch.tensor(img, dtype=torch.float),
+                torch.tensor(self.labels[idx]), torch.tensor(label_dist), means, stds)
+                # torch.tensor(self.labels[idx]), label_dist, means, stds)
 
     def reset_ids(self, ids):
         self.len = len(ids)
@@ -260,7 +261,7 @@ class CellularImageDataset(Dataset):
             and 'mixup' in self.augment
             and np.random.uniform() >= 0.5
            ):
-            img, label_dist = _mixup()
+            img, label_dist = _mixup(img, label)
         elif self.mode == 'train':
             label_dist = np.eye(1108)[label]
         else:

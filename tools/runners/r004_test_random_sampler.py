@@ -274,6 +274,7 @@ class Runner(object):
                 outputs = self.model.forward(images)
 
             if 'mixup' in self.augment:
+                labels_dist = labels_dist.to(self.device, dtype=torch.float)
                 train_loss = self.fobj(outputs, labels_dist)
             else:
                 train_loss = self.fobj(outputs, labels)
