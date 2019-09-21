@@ -1,4 +1,5 @@
 mnt/
+notebooks/
 catboost_info/
 tags*
 *__pycache__*
