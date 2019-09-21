@@ -1,7 +1,7 @@
-d_expescription: experimental standarization
+d_expescription: ews w/ no normalize
 runner: r004
 device: cuda
-batch_size: 64
+batch_size: 32
 max_epoch: 40
 fobj: ce
 dlt_bias: false
@@ -17,18 +17,8 @@ scheduler:
 sampler:
     sampler_type: random
 split: 
-    split_type: cskf
+    split_type: ews
     split_num: 5
 augment:
     - horizontalflip
     - randomrotate90
-    - normalize_exp
-      # ttas:
-      #     - original
-      #     - rotate90
-      #     - rotate180
-      #     - rotate270
-      #     - flip
-      #     - fliprotate90
-      #     - fliprotate180
-      #     - fliprotate270

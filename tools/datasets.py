@@ -58,6 +58,7 @@ class CellularImageDataset(Dataset):
         self.visualize = visualize
         self.logger = logger
         self.augment = augment
+        self.tta = None
         self.len = None
 
         if mode == "test":
@@ -87,7 +88,7 @@ class CellularImageDataset(Dataset):
         id_code = self.ids[idx]
         site = self.sites[idx]
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # RGB
-        img = self._augmentation(img, id_code, site)
+        img = self._augmentation(img, self.labels[idx], id_code, site)
         img = img.transpose(2, 0, 1)  # (h, w, c) -> (c, h, w)
 
         if 'resize' in self.augment:
@@ -150,7 +151,7 @@ class CellularImageDataset(Dataset):
 
         return ids, images, labels, sites
 
-    def _augmentation(self, img, id_code, site):
+    def _augmentation(self, img, label, id_code, site):
         # -------
         def _albumentations(mode, visualize):
             aug_list = []
@@ -180,22 +181,6 @@ class CellularImageDataset(Dataset):
                         p=0.5,
                     ))
 
-                # if you want to use additional augmentation, add operations like below.
-                # albumentations: [https://github.com/albu/albumentations]
-                """
-                aug_list.append(
-                    ShiftScaleRotate(
-                        p=1.0, shift_limit=0.0625, scale_limit=0.2, rotate_limit=15
-                    )
-                )
-                aug_list.append(RandomBrightnessContrast(p=0.5))
-                aug_list.append(
-                    HueSaturationValue(
-                        p=0.5, hue_shift_limit=5, sat_shift_limit=30, val_shift_limit=20
-                    )
-                )
-                """
-
 #             #  if not visualize:
 #             if 'normalize' in self.augment:
 #                 experiment, plate, well = id_code.split('_')
@@ -223,6 +208,9 @@ class CellularImageDataset(Dataset):
                 int(np.mean(img[:, :, 0])),
                 int(np.mean(img[:, :, 1])),
                 int(np.mean(img[:, :, 2])),
+                int(np.mean(img[:, :, 3])),
+                int(np.mean(img[:, :, 4])),
+                int(np.mean(img[:, :, 5])),
             ]
 
             mask_size_v = int(IMAGE_SIZE * np.random.randint(10, 60) * 0.01)
@@ -246,41 +234,62 @@ class CellularImageDataset(Dataset):
             img[cutout_top:cutout_bottom, cutout_left:cutout_right, :] = mask_value
 
             return img
+
+        def _mixup(img, label, alpha=0.2):
+            l = np.random.beta(alpha, alpha, 1)[0]
+            rand_idx = np.random.randint(len(self.labels))
+            rand_img = self.images[rand_idx]
+            rand_label = self.labels[rand_idx]
+            img = img * l + rand_img * (1 - l)
+            label_dist = np.eye(1108)[label]
+            rand_label_dist = np.eye(1108)[rand_label]
+            label_dist = label_dist * l + rand_label_dist * (1 - l)
+            return img, label_dist
         # -------
 
-#        if self.dlt_bias:
-#            means, stds = [], []
-#            for i in range(6):
-#                _img = img[:, :, i]
-#                means.append(_img.mean())
-#                stds.append(_img.std())
-#            img = Normalize(mean=means, std=stds).apply(img)
         img = _albumentations(self.mode, self.visualize)(image=img)["image"]
-#        if (
-#            self.mode == "train"
-#            and np.random.uniform() >= 0.5  # 50%
-#        ):
-#            img = _cutout(img)
-#        if 'normalize' in self.augment:
-#            means = []
-#            for i in range(6):
-#                _img = img[:, :, i]
-#                means.append(_img.mean())
-#            img = img - means
+        if (
+            self.mode == "train"
+            and 'cutout' in self.augment
+            and np.random.uniform() >= 0.5  # 50%
+        ):
+            img = _cutout(img)
 
-#         if 'normalize' in self.augment:
-#             experiment = id_code.split('_')[0]
-#             means = self.agg_stats_df['mean']['mean'].loc[experiment]
-#             means = (means / 255.).tolist()
-#             stds = self.agg_stats_df['std']['mean'].loc[experiment]
-#             stds = (stds / 255.).tolist()
-#             img = Normalize(mean=means, std=stds).apply(img)
-#         if 'mean_avg' in self.augment:
-#             experiment = id_code.split('_')[0]
-#             means = self.agg_stats_df['mean']['mean'].loc[experiment].values
-#             img = img / means
+        if (
+            self.mode == 'train'
+            and 'mixup' in self.augment
+            and np.random.uniform() >= 0.5
+           ):
+            img, label_dist = _mixup()
+        elif self.mode == 'train':
+            label_dist = np.eye(1108)[label]
+        else:
+            label_dist = None
 
-        return img
+        if self.tta:
+            if self.tta == 'original':
+                pass
+            elif self.tta == 'rotate90':
+                img = RandomRotate90(p=1.0).apply(img, factor=1)
+            elif self.tta == 'rotate180':
+                img = RandomRotate90(p=1.0).apply(img, factor=2)
+            elif self.tta == 'rotate270':
+                img = RandomRotate90(p=1.0).apply(img, factor=3)
+            elif self.tta == 'flip':
+                img = HorizontalFlip(p=1.0).apply(img)
+            elif self.tta == 'fliprotate90':
+                img = HorizontalFlip(p=1.0).apply(img)
+                img = RandomRotate90(p=1.0).apply(img, factor=1)
+            elif self.tta == 'fliprotate180':
+                img = HorizontalFlip(p=1.0).apply(img)
+                img = RandomRotate90(p=1.0).apply(img, factor=2)
+            elif self.tta == 'fliprotate270':
+                img = HorizontalFlip(p=1.0).apply(img)
+                img = RandomRotate90(p=1.0).apply(img, factor=3)
+            else:
+                raise Exception(f'invalid tta, {self.tta}')
+
+        return img, label_dist
 
 
 class CellularImageDatasetV2(Dataset):
