@@ -10,12 +10,13 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from adabound import AdaBound
 from sklearn.model_selection import GroupKFold as gkf
 from sklearn.model_selection import StratifiedKFold as skf
 from torch.nn.functional import softmax
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+from adabound import AdaBound
 
 from ..datasets import CellularImageDataset, ImagesDS
 from ..models import (densenet121_metric, densenet201_metric, efficientnetb2,
@@ -27,6 +28,11 @@ from ..schedulers import pass_scheduler
 from ..utils.logs import sel_log, send_line_notification
 from ..utils.splittings import CellwiseStratifiedKFold as cskf
 from ..utils.splittings import ExperimentwiseSplit as ews
+
+
+def cross_entropy(pred, soft_targets):
+    logsoftmax = nn.LogSoftmax()
+    return torch.mean(torch.sum(- soft_targets * logsoftmax(pred), 1))
 
 
 class Runner(object):
@@ -76,6 +82,8 @@ class Runner(object):
     def _get_fobj(self, fobj_type):
         if fobj_type == 'ce':
             fobj = nn.CrossEntropyLoss().to(self.device)
+        elif fobj_type == 'sce':
+            fobj = cross_entropy
         else:
             raise Exception(f'invalid fobj_type: {fobj_type}')
         return fobj
@@ -240,7 +248,7 @@ class Runner(object):
         self.model.train()
         running_loss = 0
 
-        for (ids, images, labels, means, stds) in tqdm(loader):
+        for (ids, images, labels, labels_dist, means, stds) in tqdm(loader):
             images, labels = images.to(
                 self.device, dtype=torch.float), labels.to(
                 self.device)
@@ -261,7 +269,10 @@ class Runner(object):
             else:
                 outputs = self.model.forward(images)
 
-            train_loss = self.fobj(outputs, labels)
+            if 'mixup' in self.augment:
+                train_loss = self.fobj(outputs, labels_dist)
+            else:
+                train_loss = self.fobj(outputs, labels)
 
             self.optimizer.zero_grad()
             train_loss.backward()
@@ -282,7 +293,7 @@ class Runner(object):
 
         with torch.no_grad():
             valid_preds, valid_labels = [], []
-            for (ids, images, labels, means, stds) in tqdm(loader):
+            for (ids, images, labels, labels_dist, means, stds) in tqdm(loader):
                 images, labels = images.to(
                     self.device, dtype=torch.float), labels.to(
                     self.device)
@@ -328,7 +339,8 @@ class Runner(object):
             for tta in ttas:
                 sel_log(f'tta: {tta}', self.logger)
                 loader.dataset.tta = tta
-                for (ids, images, labels, means, stds) in tqdm(loader):
+                for (ids, images, labels, labels_dist,
+                     means, stds) in tqdm(loader):
                     images, labels = images.to(
                         self.device, dtype=torch.float), labels.to(
                         self.device)
@@ -561,18 +573,22 @@ class Runner(object):
         test_loader = self._build_loader(
             mode="test", ids=tst_ids, augment=augment, batch_size=self.batch_size)
         best_loss, best_acc = self._load_best_model(cell_type)
-        test_ids, test_preds, test_raw_preds = self._test_loop(test_loader, self.ttas)
+        test_ids, test_preds, test_raw_preds = self._test_loop(
+            test_loader, self.ttas)
 
         if sub_filename:
             submission_df = pd.read_csv(sub_filename)
-            sub_raw_filename = sub_filename.replace('_sub', '_sub_raw').replace('.csv', '.pkl')
+            sub_raw_filename = sub_filename.replace(
+                '_sub', '_sub_raw').replace(
+                '.csv', '.pkl')
             submission_raw_df = pd.read_pickle(sub_raw_filename)
         else:
             submission_df = pd.read_csv(
                 './mnt/inputs/origin/sample_submission.csv')
             submission_raw_df = pd.read_csv(
                 './mnt/inputs/origin/sample_submission.csv')
-            submission_raw_df = submission_raw_df.rename(columns={'sirna': 'raw_pred'})
+            submission_raw_df = submission_raw_df.rename(
+                columns={'sirna': 'raw_pred'})
             submission_raw_df['raw_pred'] = None
         submission_df = submission_df.set_index('id_code')
         submission_df.loc[test_ids, 'sirna'] = test_preds
