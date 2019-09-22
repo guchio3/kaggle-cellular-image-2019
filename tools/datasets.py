@@ -93,15 +93,6 @@ class CellularImageDataset(Dataset):
         id_code = self.ids[idx]
         site = self.sites[idx]
         plate = self.plates[idx]
-        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # RGB
-        img, label_dist = self._augmentation(
-            img, self.labels[idx], id_code, site)
-        img = img.transpose(2, 0, 1)  # (h, w, c) -> (c, h, w)
-
-        if 'resize' in self.augment:
-            assert img.shape == (6, RESIZE_IMAGE_SIZE, RESIZE_IMAGE_SIZE)
-        else:
-            assert img.shape == (6, IMAGE_SIZE, IMAGE_SIZE)
 
         experiment = id_code.split('_')[0]
         if 'normalize'in self.augment:
@@ -112,18 +103,32 @@ class CellularImageDataset(Dataset):
         elif 'normalize_exp':
             means = torch.tensor(
                 self.agg_stats_df['mean']['mean'].loc[experiment].values)
+            means = (means / 255.).tolist()
     #        means = (means / 255.).tolist()
             stds = torch.tensor(
                 self.agg_stats_df['std']['mean'].loc[experiment].values)
+            stds = (stds / 255.).tolist()
     #        stds = (stds / 255.).tolist()
         elif 'normalize_plate_exp':
             means = torch.tensor(
                 self.plate_agg_stats_df['mean']['mean'].loc[experiment].loc[plate].values)
+            means = (means / 255.).tolist()
             stds = torch.tensor(
                 self.plate_agg_stats_df['std']['mean'].loc[experiment].loc[plate].values)
+            stds = (stds / 255.).tolist()
         else:
             means = None
             stds = None
+
+        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # RGB
+        img, label_dist = self._augmentation(
+            img, self.labels[idx], id_code, site)
+        img = img.transpose(2, 0, 1)  # (h, w, c) -> (c, h, w)
+
+        if 'resize' in self.augment:
+            assert img.shape == (6, RESIZE_IMAGE_SIZE, RESIZE_IMAGE_SIZE)
+        else:
+            assert img.shape == (6, IMAGE_SIZE, IMAGE_SIZE)
 
         return (self.ids[idx], torch.tensor(img, dtype=torch.float),
                 torch.tensor(self.labels[idx]), torch.tensor(label_dist), means, stds)
@@ -169,7 +174,7 @@ class CellularImageDataset(Dataset):
 
         return ids, images, labels, sites, plates
 
-    def _augmentation(self, img, label, id_code, site):
+    def _augmentation(self, img, label, id_code, site, means, stds):
         # -------
         def _albumentations(mode, visualize):
             aug_list = []

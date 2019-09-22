@@ -22,7 +22,7 @@ from ..datasets import CellularImageDataset, ImagesDS
 from ..models import (densenet121_metric, densenet201_metric, efficientnetb2,
                       efficientnetb2_metric, efficientnetb2_metric_bn,
                       efficientnetb2_metric_larger, efficientnetb4,
-                      efficientnetb5, efficientnetb7, resnet18)
+                      efficientnetb5, efficientnetb5_metric, efficientnetb7, resnet18)
 from ..schedulers import CosineAnnealingWarmUpRestarts as cawur
 from ..schedulers import pass_scheduler
 from ..utils.logs import sel_log, send_line_notification
@@ -109,6 +109,8 @@ class Runner(object):
             model = efficientnetb2_metric_bn.Network(pretrained, 1108)
         elif model_type == 'efficientnetb2_metric_larger':
             model = efficientnetb2_metric_larger.Network(pretrained, 1108)
+        elif model_type == 'efficientnetb5_metric':
+            model = efficientnetb5_metric.Network(pretrained, 1108, self.easy_margin)
         elif model_type == 'densenet121_metric':
             model = densenet121_metric.Network(pretrained, 1108)
         elif model_type == 'densenet201_metric':
