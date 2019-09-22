@@ -257,6 +257,7 @@ class CellularImageDataset(Dataset):
             l = np.random.beta(alpha, alpha, 1)[0]
             rand_idx = np.random.randint(len(self.labels))
             rand_img = self.images[rand_idx]
+            rand_img = _albumentations('train', self.visualize)(image=rand_img)["image"]
             rand_label = self.labels[rand_idx]
             img = img * l + rand_img * (1 - l)
             label_dist = np.eye(1108)[label]
@@ -276,7 +277,7 @@ class CellularImageDataset(Dataset):
         if (
             self.mode == 'train'
             and 'mixup' in self.augment
-            and np.random.uniform() >= 0.5
+            and np.random.uniform() >= 0.
         ):
             img, label_dist = _mixup(img, label)
         elif self.mode == 'train':

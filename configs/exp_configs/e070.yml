@@ -23,4 +23,4 @@ augment:
     - horizontalflip
     - randomrotate90
     - mixup
-    - normalize_plate_exp
+      #    - normalize_plate_exp
