@@ -368,14 +368,15 @@ class Runner(object):
                             or 'normalize_exp' in self.augment
                             or 'normalize_plate_exp' in self.augment
                     ):
+                        _batch_size = images.shape[0]
                         means = means.to(self.device, dtype=torch.float)
                         means = means.reshape(
-                            self.batch_size, 6, 1, 1).expand(
-                            self.batch_size, 6, 512, 512)
+                            _batch_size, 6, 1, 1).expand(
+                            _batch_size, 6, 512, 512)
                         stds = stds.to(self.device, dtype=torch.float)
                         stds = stds.reshape(
-                            self.batch_size, 6, 1, 1).expand(
-                            self.batch_size, 6, 512, 512)
+                            _batch_size, 6, 1, 1).expand(
+                            _batch_size, 6, 512, 512)
                         images -= means
                         images /= stds
 

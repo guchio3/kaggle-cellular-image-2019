@@ -282,7 +282,7 @@ class CellularImageDataset(Dataset):
         elif self.mode == 'train':
             label_dist = np.eye(1108)[label]
         else:
-            label_dist = None
+            label_dist = np.zeros(1108)
 
         if self.tta:
             if self.tta == 'original':
