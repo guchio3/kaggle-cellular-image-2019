@@ -258,21 +258,21 @@ class Runner(object):
             images, labels = images.to(
                 self.device, dtype=torch.float), labels.to(
                 self.device)
-            if (
-                    'normalize' in self.augment
-                    or 'normalize_exp' in self.augment
-                    or 'normalize_plate_exp' in self.augment
-            ):
-                means = means.to(self.device, dtype=torch.float)
-                means = means.reshape(
-                    self.batch_size, 6, 1, 1).expand(
-                    self.batch_size, 6, 512, 512)
-                stds = stds.to(self.device, dtype=torch.float)
-                stds = stds.reshape(
-                    self.batch_size, 6, 1, 1).expand(
-                    self.batch_size, 6, 512, 512)
-                images -= means
-                images /= stds
+#             if (
+#                     'normalize' in self.augment
+#                     or 'normalize_exp' in self.augment
+#                     or 'normalize_plate_exp' in self.augment
+#             ):
+#                 means = means.to(self.device, dtype=torch.float)
+#                 means = means.reshape(
+#                     self.batch_size, 6, 1, 1).expand(
+#                     self.batch_size, 6, 512, 512)
+#                 stds = stds.to(self.device, dtype=torch.float)
+#                 stds = stds.reshape(
+#                     self.batch_size, 6, 1, 1).expand(
+#                     self.batch_size, 6, 512, 512)
+#                 images -= means
+#                 images /= stds
 
             if self.metric and 'mixup' in self.augment:
                 labels_dist = labels_dist.to(self.device, dtype=torch.float)
@@ -310,21 +310,21 @@ class Runner(object):
                 images, labels = images.to(
                     self.device, dtype=torch.float), labels.to(
                     self.device)
-                if (
-                        'normalize' in self.augment
-                        or 'normalize_exp' in self.augment
-                        or 'normalize_plate_exp' in self.augment
-                ):
-                    means = means.to(self.device, dtype=torch.float)
-                    means = means.reshape(
-                        self.batch_size, 6, 1, 1).expand(
-                        self.batch_size, 6, 512, 512)
-                    stds = stds.to(self.device, dtype=torch.float)
-                    stds = stds.reshape(
-                        self.batch_size, 6, 1, 1).expand(
-                        self.batch_size, 6, 512, 512)
-                    images -= means
-                    images /= stds
+#                 if (
+#                         'normalize' in self.augment
+#                         or 'normalize_exp' in self.augment
+#                         or 'normalize_plate_exp' in self.augment
+#                 ):
+#                     means = means.to(self.device, dtype=torch.float)
+#                     means = means.reshape(
+#                         self.batch_size, 6, 1, 1).expand(
+#                         self.batch_size, 6, 512, 512)
+#                     stds = stds.to(self.device, dtype=torch.float)
+#                     stds = stds.reshape(
+#                         self.batch_size, 6, 1, 1).expand(
+#                         self.batch_size, 6, 512, 512)
+#                     images -= means
+#                     images /= stds
 
                 outputs = self.model.forward(images)
                 if 'mixup' in self.augment:
@@ -365,22 +365,22 @@ class Runner(object):
                     images, labels = images.to(
                         self.device, dtype=torch.float), labels.to(
                         self.device)
-                    if (
-                            'normalize' in self.augment
-                            or 'normalize_exp' in self.augment
-                            or 'normalize_plate_exp' in self.augment
-                    ):
-                        _batch_size = images.shape[0]
-                        means = means.to(self.device, dtype=torch.float)
-                        means = means.reshape(
-                            _batch_size, 6, 1, 1).expand(
-                            _batch_size, 6, 512, 512)
-                        stds = stds.to(self.device, dtype=torch.float)
-                        stds = stds.reshape(
-                            _batch_size, 6, 1, 1).expand(
-                            _batch_size, 6, 512, 512)
-                        images -= means
-                        images /= stds
+#                     if (
+#                             'normalize' in self.augment
+#                             or 'normalize_exp' in self.augment
+#                             or 'normalize_plate_exp' in self.augment
+#                     ):
+#                         _batch_size = images.shape[0]
+#                         means = means.to(self.device, dtype=torch.float)
+#                         means = means.reshape(
+#                             _batch_size, 6, 1, 1).expand(
+#                             _batch_size, 6, 512, 512)
+#                         stds = stds.to(self.device, dtype=torch.float)
+#                         stds = stds.reshape(
+#                             _batch_size, 6, 1, 1).expand(
+#                             _batch_size, 6, 512, 512)
+#                         images -= means
+#                         images /= stds
 
                     outputs = self.model.forward(images)
                     sm_outputs = softmax(outputs, dim=1)
@@ -542,6 +542,8 @@ class Runner(object):
             augment = ['normalize']
         elif 'normalize_exp' in self.augment:
             augment = ['normalize_exp']
+        elif 'normalize_plate_exp' in self.augment:
+            augment = ['normalize_plate_exp']
         else:
             augment = []
         valid_loader = self._build_loader(
@@ -594,6 +596,8 @@ class Runner(object):
             augment = ['normalize']
         elif 'normalize_exp' in self.augment:
             augment = ['normalize_exp']
+        elif 'normalize_plate_exp' in self.augment:
+            augment = ['normalize_plate_exp']
         else:
             augment = []
         test_loader = self._build_loader(

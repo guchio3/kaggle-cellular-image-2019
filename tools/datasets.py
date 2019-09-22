@@ -62,11 +62,13 @@ class CellularImageDataset(Dataset):
         self.len = None
 
         if mode == "test":
-            tst_df = pd.read_csv('./mnt/inputs/origin/test.csv').set_index('id_code')
+            tst_df = pd.read_csv(
+                './mnt/inputs/origin/test.csv').set_index('id_code')
             labels = [0] * len(ids)
             plates = tst_df.loc[ids]['plate'].values
         else:  # train or valid
-            trn_df = pd.read_csv('./mnt/inputs/origin/train.csv.zip').set_index('id_code')
+            trn_df = pd.read_csv(
+                './mnt/inputs/origin/train.csv.zip').set_index('id_code')
             labels = trn_df.loc[ids]['sirna'].values
             plates = trn_df.loc[ids]['plate'].values
         self.ids, self.images, self.labels, self.sites, self.plates = self._parse_ids(
@@ -95,12 +97,12 @@ class CellularImageDataset(Dataset):
         plate = self.plates[idx]
 
         experiment = id_code.split('_')[0]
-        if 'normalize'in self.augment:
+        if 'normalize' in self.augment:
             means = torch.tensor(self.stats_df.query(
                 f'id_code == "{id_code}" and site == {site}')['mean'].values)
             stds = torch.tensor(self.stats_df.query(
                 f'id_code == "{id_code}" and site == {site}')['std'].values)
-        elif 'normalize_exp':
+        elif 'normalize_exp' in self.augment:
             means = torch.tensor(
                 self.agg_stats_df['mean']['mean'].loc[experiment].values)
             means = (means / 255.).tolist()
@@ -109,7 +111,7 @@ class CellularImageDataset(Dataset):
                 self.agg_stats_df['std']['mean'].loc[experiment].values)
             stds = (stds / 255.).tolist()
     #        stds = (stds / 255.).tolist()
-        elif 'normalize_plate_exp':
+        elif 'normalize_plate_exp' in self.augment:
             means = torch.tensor(
                 self.plate_agg_stats_df['mean']['mean'].loc[experiment].loc[plate].values)
             means = (means / 255.).tolist()
@@ -122,7 +124,7 @@ class CellularImageDataset(Dataset):
 
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # RGB
         img, label_dist = self._augmentation(
-            img, self.labels[idx], id_code, site)
+            img, self.labels[idx], id_code, site, means, stds)
         img = img.transpose(2, 0, 1)  # (h, w, c) -> (c, h, w)
 
         if 'resize' in self.augment:
@@ -157,7 +159,8 @@ class CellularImageDataset(Dataset):
             iter_func = partial(
                 _load_imgs_from_ids,
                 mode=mode)
-            imap = p.imap_unordered(iter_func, list(zip(ids, original_labels, plates)))
+            imap = p.imap_unordered(iter_func, list(
+                zip(ids, original_labels, plates)))
             res_id_pairs = list(tqdm(imap, total=len(ids)))
             p.close()
             p.join()
@@ -176,7 +179,7 @@ class CellularImageDataset(Dataset):
 
     def _augmentation(self, img, label, id_code, site, means, stds):
         # -------
-        def _albumentations(mode, visualize):
+        def _albumentations(mode, visualize, means, stds):
             aug_list = []
 
             if 'resize' in self.augment:
@@ -203,6 +206,12 @@ class CellularImageDataset(Dataset):
                         width=512,
                         p=0.5,
                     ))
+                if (
+                    'normalize'in self.augment
+                    or 'normalize_exp'in self.augment
+                    or 'normalize_plate_exp'in self.augment
+                ):
+                    aug_list.append(Normalize(p=1.0, mean=means, std=stds))
 
 #             #  if not visualize:
 #             if 'normalize' in self.augment:
@@ -261,8 +270,34 @@ class CellularImageDataset(Dataset):
         def _mixup(img, label, alpha=0.2):
             l = np.random.beta(alpha, alpha, 1)[0]
             rand_idx = np.random.randint(len(self.labels))
+            id_code = self.ids[rand_idx]
+            plate = self.plates[rand_idx]
+            experiment = id_code.split('_')[0]
+            if 'normalize' in self.augment:
+                means = torch.tensor(self.stats_df.query(
+                    f'id_code == "{id_code}" and site == {site}')['mean'].values)
+                stds = torch.tensor(self.stats_df.query(
+                    f'id_code == "{id_code}" and site == {site}')['std'].values)
+            elif 'normalize_exp' in self.augment:
+                means = torch.tensor(
+                    self.agg_stats_df['mean']['mean'].loc[experiment].values)
+                means = (means / 255.).tolist()
+                stds = torch.tensor(
+                    self.agg_stats_df['std']['mean'].loc[experiment].values)
+                stds = (stds / 255.).tolist()
+            elif 'normalize_plate_exp' in self.augment:
+                means = torch.tensor(
+                    self.plate_agg_stats_df['mean']['mean'].loc[experiment].loc[plate].values)
+                means = (means / 255.).tolist()
+                stds = torch.tensor(
+                    self.plate_agg_stats_df['std']['mean'].loc[experiment].loc[plate].values)
+                stds = (stds / 255.).tolist()
+            else:
+                raise Exception('use normalize_plate_exp')
             rand_img = self.images[rand_idx]
-            rand_img = _albumentations('train', self.visualize)(image=rand_img)["image"]
+            rand_img = _albumentations(
+                'train', self.visualize, means, stds)(
+                image=rand_img)["image"]
             rand_label = self.labels[rand_idx]
             img = img * l + rand_img * (1 - l)
             label_dist = np.eye(1108)[label]
@@ -271,7 +306,7 @@ class CellularImageDataset(Dataset):
             return img, label_dist
         # -------
 
-        img = _albumentations(self.mode, self.visualize)(image=img)["image"]
+        img = _albumentations(self.mode, self.visualize, means, stds)(image=img)["image"]
         if (
             self.mode == "train"
             and 'cutout' in self.augment

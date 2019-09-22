@@ -3,7 +3,7 @@ runner: r004
 device: cuda
 batch_size: 24
 max_epoch: 40
-fobj: ce
+fobj: sce
 dlt_bias: false
 dlt_var: false
 model:
@@ -22,7 +22,7 @@ split:
 augment:
     - horizontalflip
     - randomrotate90
-      #    - mixup
+    - mixup
     - normalize_plate_exp
 ttas:
     - original
