@@ -62,7 +62,7 @@ class CellularImageDataset(Dataset):
         self.len = None
 
         if mode == "test":
-            tst_df = pd.read_csv('./mnt/inputs/origin/train.csv.zip').set_index('id_code')
+            tst_df = pd.read_csv('./mnt/inputs/origin/test.csv').set_index('id_code')
             labels = [0] * len(ids)
             plates = tst_df.loc[ids]['plate'].values
         else:  # train or valid
@@ -283,7 +283,7 @@ class CellularImageDataset(Dataset):
         elif self.mode == 'train':
             label_dist = np.eye(1108)[label]
         else:
-            label_dist = None
+            label_dist = np.zeros(1108)
 
         if self.tta:
             if self.tta == 'original':
