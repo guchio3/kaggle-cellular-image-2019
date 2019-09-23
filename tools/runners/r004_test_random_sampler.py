@@ -260,6 +260,9 @@ class Runner(object):
             images, labels = images.to(
                 self.device, dtype=torch.float), labels.to(
                 self.device)
+            # ctrl_images = ctrl_images.to(self.device, dtype=torch.float)
+            ctrl_images = ctrl_images.to('cpu')
+            del ctrl_images
 #             if (
 #                     'normalize' in self.augment
 #                     or 'normalize_exp' in self.augment
@@ -280,15 +283,15 @@ class Runner(object):
                 labels_dist = labels_dist.to(self.device, dtype=torch.float)
                 outputs, features = self.model.forward(images, labels_dist)
                 pos_outputs, ctrl_features = self.model.forward(ctrl_images, labels)
-                minus_features = features - ctrl_features
-                outputs = self.model.module.arc(minus_features, labels)
                 train_loss = self.fobj(outputs, labels_dist)
+                train_loss += self.fobj(pos_outputs, labels_dist)
+                train_loss += self.cosobj(features, ctrl_features, torch.ones(self.batch_size).to(self.device))
             elif self.metric:
                 outputs, features = self.model.forward(images, labels)
-                pos_outputs, ctrl_features = self.model.forward(ctrl_images, labels)
-                minus_features = features - ctrl_features
-                outputs = self.model.module.arc(minus_features, labels)
+                # pos_outputs, ctrl_features = self.model.forward(ctrl_images, labels)
                 train_loss = self.fobj(outputs, labels)
+                # train_loss += self.fobj(pos_outputs, labels)
+                # train_loss += self.cosobj(features, ctrl_features, torch.ones(self.batch_size).to(self.device))
             else:
                 outputs = self.model.forward(images)
                 train_loss = self.fobj(outputs, labels)
@@ -312,7 +315,7 @@ class Runner(object):
 
         with torch.no_grad():
             valid_preds, valid_labels = [], []
-            for (ids, images, ctrl_images, labels, labels_dist, means, stds) in tqdm(loader):
+            for (ids, images, labels, labels_dist, means, stds) in tqdm(loader):
                 images, labels = images.to(
                     self.device, dtype=torch.float), labels.to(
                     self.device)
@@ -334,9 +337,6 @@ class Runner(object):
 
                 if self.metric:
                     outputs, features = self.model.forward(images, labels)
-                    pos_outputs, ctrl_features = self.model.forward(ctrl_images, labels)
-                    minus_features = features - ctrl_features
-                    outputs = self.model.module.arc(minus_features, labels)
                 else:
                     outputs = self.model.forward(images)
                 if 'mixup' in self.augment:
@@ -372,7 +372,7 @@ class Runner(object):
             for tta in ttas:
                 sel_log(f'tta: {tta}', self.logger)
                 loader.dataset.tta = tta
-                for (ids, images, ctrl_images, labels, labels_dist,
+                for (ids, images, labels, labels_dist,
                      means, stds) in tqdm(loader):
                     images, labels = images.to(
                         self.device, dtype=torch.float), labels.to(
@@ -396,9 +396,6 @@ class Runner(object):
 
                     if self.metric:
                         outputs, features = self.model.forward(images, labels)
-                        pos_outputs, ctrl_features = self.model.forward(ctrl_images, labels)
-                        minus_features = features - ctrl_features
-                        outputs = self.model.module.arc(minus_features, labels)
                     else:
                         outputs = self.model.forward(images)
                     sm_outputs = softmax(outputs, dim=1)

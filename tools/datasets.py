@@ -83,14 +83,14 @@ class CellularImageDataset(Dataset):
         assert len(self.images) == len(self.labels)
         self.w_posneg = w_posneg
         self.idxes = np.array([i for i in range(len(labels) * 2)])
-        if mode == 'train':
-            self.ctrl_df = pd.read_csv('./mnt/inputs/origin/train_controls.csv').query('well_type == "negative_control"').reset_index(drop=True)
-        else:
-            self.ctrl_df = pd.read_csv('./mnt/inputs/origin/train_controls.csv').query('well_type == "negative_control"').reset_index(drop=True)
-        self.ctrl_ids, self.ctrl_images, self.ctrl_labels, self.ctrl_sites, self.ctrl_plates = self._parse_ids(
-            mode, self.ctrl_df.id_code.tolist(), self.ctrl_df.sirna.tolist(), self.ctrl_df.plate.tolist())
-        self.ctrl_idxes = np.array([i for i in range(len(self.ctrl_ids))])
-        self.ctrl_experiments = np.array([id_code.split('_')[0] for id_code in self.ctrl_ids])
+#         if mode == 'train':
+#             self.ctrl_df = pd.read_csv('./mnt/inputs/origin/train_controls.csv').query('well_type == "negative_control"').reset_index(drop=True)
+#         else:
+#             self.ctrl_df = pd.read_csv('./mnt/inputs/origin/train_controls.csv').query('well_type == "negative_control"').reset_index(drop=True)
+#         self.ctrl_ids, self.ctrl_images, self.ctrl_labels, self.ctrl_sites, self.ctrl_plates = self._parse_ids(
+#             mode, self.ctrl_df.id_code.tolist(), self.ctrl_df.sirna.tolist(), self.ctrl_df.plate.tolist())
+#         self.ctrl_idxes = np.array([i for i in range(len(self.ctrl_ids))])
+#         self.ctrl_experiments = np.array([id_code.split('_')[0] for id_code in self.ctrl_ids])
 
     def __len__(self):
         if self.len:
@@ -107,14 +107,17 @@ class CellularImageDataset(Dataset):
         plate = self.plates[idx]
         label = self.labels[idx]
         experiment = id_code.split('_')[0]
-        # if self.w_posneg:
-        if True:
-            ctrl_idx = np.random.choice(self.ctrl_idxes[(self.ctrl_experiments == experiment) & (self.ctrl_plates == plate)])
-            ctrl_img = self.ctrl_images[ctrl_idx]
-            ctrl_id_code = self.ctrl_ids[ctrl_idx]
+        # if True:
+        if self.w_posneg:
+            ctrl_idx = np.random.choice(self.idxes[(self.labels == label)])
+            if self.len:
+                ctrl_idx = self.id_converter[ctrl_idx]
+            # ctrl_idx = np.random.choice(self.ctrl_idxes[(self.ctrl_experiments == experiment) & (self.ctrl_plates == plate)])
+            ctrl_img = self.images[ctrl_idx]
+            ctrl_id_code = self.ids[ctrl_idx]
             ctrl_experiment = ctrl_id_code.split('_')[0]
-            ctrl_plate = self.ctrl_plates[ctrl_idx]
-            ctrl_site = self.ctrl_sites[ctrl_idx]
+            ctrl_plate = self.plates[ctrl_idx]
+            ctrl_site = self.sites[ctrl_idx]
             ctrl_label = self.labels[ctrl_idx]
             if 'normalize_exp' in self.augment:
                 ctrl_means = torch.tensor(
@@ -172,8 +175,12 @@ class CellularImageDataset(Dataset):
         else:
             assert img.shape == (6, IMAGE_SIZE, IMAGE_SIZE)
 
-        return (self.ids[idx], torch.tensor(img, dtype=torch.float), torch.tensor(ctrl_img, dtype=torch.float),
-                torch.tensor(self.labels[idx]), torch.tensor(label_dist), means, stds)
+        if self.w_posneg:
+            return (self.ids[idx], torch.tensor(img, dtype=torch.float), torch.tensor(ctrl_img, dtype=torch.float),
+                    torch.tensor(self.labels[idx]), torch.tensor(label_dist), means, stds)
+        else:
+            return (self.ids[idx], torch.tensor(img, dtype=torch.float),
+                    torch.tensor(self.labels[idx]), torch.tensor(label_dist), means, stds)
         # torch.tensor(self.labels[idx]), label_dist, means, stds)
 
     def reset_ids(self, ids):
