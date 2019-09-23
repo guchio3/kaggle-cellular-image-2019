@@ -50,7 +50,7 @@ def _load_imgs_from_ids(id_pair, mode):
 
 class CellularImageDataset(Dataset):
     def __init__(self, mode, ids, augment,
-                 visualize=False, logger=None):
+                 visualize=False, logger=None, w_posneg=False):
         '''
         ids : id_code
         '''
@@ -81,6 +81,16 @@ class CellularImageDataset(Dataset):
 
         # load validation
         assert len(self.images) == len(self.labels)
+        self.w_posneg = w_posneg
+        self.idxes = np.array([i for i in range(len(labels) * 2)])
+        if mode == 'train':
+            self.ctrl_df = pd.read_csv('./mnt/inputs/origin/train_controls.csv').query('well_type == "negative_control"').reset_index(drop=True)
+        else:
+            self.ctrl_df = pd.read_csv('./mnt/inputs/origin/train_controls.csv').query('well_type == "negative_control"').reset_index(drop=True)
+        self.ctrl_ids, self.ctrl_images, self.ctrl_labels, self.ctrl_sites, self.ctrl_plates = self._parse_ids(
+            mode, self.ctrl_df.id_code.tolist(), self.ctrl_df.sirna.tolist(), self.ctrl_df.plate.tolist())
+        self.ctrl_idxes = np.array([i for i in range(len(self.ctrl_ids))])
+        self.ctrl_experiments = np.array([id_code.split('_')[0] for id_code in self.ctrl_ids])
 
     def __len__(self):
         if self.len:
@@ -95,8 +105,38 @@ class CellularImageDataset(Dataset):
         id_code = self.ids[idx]
         site = self.sites[idx]
         plate = self.plates[idx]
-
+        label = self.labels[idx]
         experiment = id_code.split('_')[0]
+        # if self.w_posneg:
+        if True:
+            ctrl_idx = np.random.choice(self.ctrl_idxes[(self.ctrl_experiments == experiment) & (self.ctrl_plates == plate)])
+            ctrl_img = self.ctrl_images[ctrl_idx]
+            ctrl_id_code = self.ctrl_ids[ctrl_idx]
+            ctrl_experiment = ctrl_id_code.split('_')[0]
+            ctrl_plate = self.ctrl_plates[ctrl_idx]
+            ctrl_site = self.ctrl_sites[ctrl_idx]
+            ctrl_label = self.labels[ctrl_idx]
+            if 'normalize_exp' in self.augment:
+                ctrl_means = torch.tensor(
+                    self.agg_stats_df['mean']['mean'].loc[ctrl_experiment].values)
+                ctrl_means = (ctrl_means / 255.).tolist()
+                ctrl_stds = torch.tensor(
+                    self.agg_stats_df['std']['mean'].loc[ctrl_experiment].values)
+                ctrl_stds = (ctrl_stds / 255.).tolist()
+            elif 'normalize_plate_exp' in self.augment:
+                ctrl_means = torch.tensor(
+                    self.plate_agg_stats_df['mean']['mean'].loc[ctrl_experiment].loc[ctrl_plate].values)
+                ctrl_means = (ctrl_means / 255.).tolist()
+                ctrl_stds = torch.tensor(
+                    self.plate_agg_stats_df['std']['mean'].loc[ctrl_experiment].loc[ctrl_plate].values)
+                ctrl_stds = (ctrl_stds / 255.).tolist()
+            else:
+                ctrl_means = None
+                ctrl_stds = None
+            ctrl_img, _ = self._augmentation(
+                ctrl_img, ctrl_label, ctrl_id_code, ctrl_site, ctrl_means, ctrl_stds)
+            ctrl_img = ctrl_img.transpose(2, 0, 1)  # (h, w, c) -> (c, h, w)
+
         if 'normalize' in self.augment:
             means = torch.tensor(self.stats_df.query(
                 f'id_code == "{id_code}" and site == {site}')['mean'].values)
@@ -132,7 +172,7 @@ class CellularImageDataset(Dataset):
         else:
             assert img.shape == (6, IMAGE_SIZE, IMAGE_SIZE)
 
-        return (self.ids[idx], torch.tensor(img, dtype=torch.float),
+        return (self.ids[idx], torch.tensor(img, dtype=torch.float), torch.tensor(ctrl_img, dtype=torch.float),
                 torch.tensor(self.labels[idx]), torch.tensor(label_dist), means, stds)
         # torch.tensor(self.labels[idx]), label_dist, means, stds)
 
@@ -175,7 +215,7 @@ class CellularImageDataset(Dataset):
             sites.append(res_id_pair[3])
             plates.append(res_id_pair[4])
 
-        return ids, images, labels, sites, plates
+        return np.array(ids), images, np.array(labels), np.array(sites), np.array(plates)
 
     def _augmentation(self, img, label, id_code, site, means, stds):
         # -------

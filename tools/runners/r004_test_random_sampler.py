@@ -50,6 +50,7 @@ class Runner(object):
         self.batch_size = config['batch_size']
         self.max_epoch = config['max_epoch']
         self.fobj = self._get_fobj(config['fobj'])
+        self.cosobj = nn.CosineEmbeddingLoss().to(self.device)
         if 'easy_margin' in config['model']:
             self.easy_margin = config['model']['easy_margin']
         else:
@@ -80,6 +81,7 @@ class Runner(object):
         if args.base_weight:
             if args.base_weight == 'best_all':
                 args.base_weight, _, _ = self._search_best_filename('ALL')
+            sel_log(f'USE THE BASE WEIGHT OF {args.base_weight}', self.logger)
             checkpoint = torch.load(args.base_weight)
             self.model.load_state_dict(checkpoint['model_state_dict'])
 
@@ -219,8 +221,8 @@ class Runner(object):
             # data_source=dataset.image_files)
         return sampler
 
-    def _build_loader(self, mode, ids, augment, batch_size=None):
-        dataset = CellularImageDataset(mode, ids, augment)
+    def _build_loader(self, mode, ids, augment, batch_size=None, w_posneg=False):
+        dataset = CellularImageDataset(mode, ids, augment, w_posneg=w_posneg)
         # dataset = ImagesDS(ids, './mnt/inputs/', mode)
         sampler = self._get_sampler(dataset, mode, self.sampler_type)
         drop_last = True if mode == 'train' else False
@@ -254,7 +256,7 @@ class Runner(object):
         self.model.train()
         running_loss = 0
 
-        for (ids, images, labels, labels_dist, means, stds) in tqdm(loader):
+        for (ids, images, ctrl_images, labels, labels_dist, means, stds) in tqdm(loader):
             images, labels = images.to(
                 self.device, dtype=torch.float), labels.to(
                 self.device)
@@ -276,15 +278,19 @@ class Runner(object):
 
             if self.metric and 'mixup' in self.augment:
                 labels_dist = labels_dist.to(self.device, dtype=torch.float)
-                outputs = self.model.forward(images, labels_dist)
+                outputs, features = self.model.forward(images, labels_dist)
+                pos_outputs, ctrl_features = self.model.forward(ctrl_images, labels)
+                minus_features = features - ctrl_features
+                outputs = self.model.module.arc(minus_features, labels)
+                train_loss = self.fobj(outputs, labels_dist)
             elif self.metric:
-                outputs = self.model.forward(images, labels)
+                outputs, features = self.model.forward(images, labels)
+                pos_outputs, ctrl_features = self.model.forward(ctrl_images, labels)
+                minus_features = features - ctrl_features
+                outputs = self.model.module.arc(minus_features, labels)
+                train_loss = self.fobj(outputs, labels)
             else:
                 outputs = self.model.forward(images)
-
-            if 'mixup' in self.augment:
-                train_loss = self.fobj(outputs, labels_dist)
-            else:
                 train_loss = self.fobj(outputs, labels)
 
             self.optimizer.zero_grad()
@@ -306,7 +312,7 @@ class Runner(object):
 
         with torch.no_grad():
             valid_preds, valid_labels = [], []
-            for (ids, images, labels, labels_dist, means, stds) in tqdm(loader):
+            for (ids, images, ctrl_images, labels, labels_dist, means, stds) in tqdm(loader):
                 images, labels = images.to(
                     self.device, dtype=torch.float), labels.to(
                     self.device)
@@ -326,7 +332,13 @@ class Runner(object):
 #                     images -= means
 #                     images /= stds
 
-                outputs = self.model.forward(images)
+                if self.metric:
+                    outputs, features = self.model.forward(images, labels)
+                    pos_outputs, ctrl_features = self.model.forward(ctrl_images, labels)
+                    minus_features = features - ctrl_features
+                    outputs = self.model.module.arc(minus_features, labels)
+                else:
+                    outputs = self.model.forward(images)
                 if 'mixup' in self.augment:
                     labels_dist = labels_dist.to(self.device, dtype=torch.float)
                     valid_loss = self.fobj(outputs, labels_dist)
@@ -360,7 +372,7 @@ class Runner(object):
             for tta in ttas:
                 sel_log(f'tta: {tta}', self.logger)
                 loader.dataset.tta = tta
-                for (ids, images, labels, labels_dist,
+                for (ids, images, ctrl_images, labels, labels_dist,
                      means, stds) in tqdm(loader):
                     images, labels = images.to(
                         self.device, dtype=torch.float), labels.to(
@@ -382,7 +394,13 @@ class Runner(object):
 #                         images -= means
 #                         images /= stds
 
-                    outputs = self.model.forward(images)
+                    if self.metric:
+                        outputs, features = self.model.forward(images, labels)
+                        pos_outputs, ctrl_features = self.model.forward(ctrl_images, labels)
+                        minus_features = features - ctrl_features
+                        outputs = self.model.module.arc(minus_features, labels)
+                    else:
+                        outputs = self.model.forward(images)
                     sm_outputs = softmax(outputs, dim=1)
     #                sm_outputs = torch.mean(torch.stack(
     #                    [sm_outputs[i::AUGNUM] for i in range(AUGNUM)], dim=2), dim=2)
@@ -537,7 +555,7 @@ class Runner(object):
             val_ids = val_ids[:300]
 
         train_loader = self._build_loader(
-            mode="train", ids=trn_ids, augment=self.augment)
+            mode="train", ids=trn_ids, augment=self.augment, w_posneg=True)
         if 'normalize' in self.augment:
             augment = ['normalize']
         elif 'normalize_exp' in self.augment:

@@ -40,7 +40,7 @@ class Network(nn.Module):
                 labels = torch.zeros(x.shape[0], device='cuda')
         features = self.model(x)
         out = self.arc(features, labels)
-        return out
+        return out, features
 
     def named_children(self):
         for name, module in self.model.named_children():
