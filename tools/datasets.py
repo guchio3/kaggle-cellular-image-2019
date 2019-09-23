@@ -206,12 +206,12 @@ class CellularImageDataset(Dataset):
                         width=512,
                         p=0.5,
                     ))
-                if (
-                    'normalize'in self.augment
-                    or 'normalize_exp'in self.augment
-                    or 'normalize_plate_exp'in self.augment
-                ):
-                    aug_list.append(Normalize(p=1.0, mean=means, std=stds))
+            if (
+                'normalize'in self.augment
+                or 'normalize_exp'in self.augment
+                or 'normalize_plate_exp'in self.augment
+            ):
+                aug_list.append(Normalize(p=1.0, mean=means, std=stds))
 
 #             #  if not visualize:
 #             if 'normalize' in self.augment:
