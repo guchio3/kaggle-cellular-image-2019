@@ -1,5 +1,10 @@
 import numpy as np
 import pandas as pd
+import scipy
+import scipy.special
+import scipy.optimize
+import json
+from tqdm import tqdm
 
 from tools.utils.args import parse_plate_args
 
@@ -53,7 +58,22 @@ if __name__ == '__main__':
         pp_mult[mask] = 0
         return pp_mult
 
-    for idx in range(len(all_test_exp)):
+    def assign_plate(plate):
+        probabilities = np.array(plate)
+        cost = probabilities * -1
+        rows, cols = scipy.optimize.linear_sum_assignment(cost)
+        chosen_elements = set(zip(rows.tolist(), cols.tolist()))
+
+        for sample in range(cost.shape[0]):
+            for sirna in range(cost.shape[1]):
+                if (sample, sirna) not in chosen_elements:
+                    probabilities[sample, sirna] = 0
+
+        return probabilities.argmax(axis=1).tolist()
+
+    sub_preds_df = sub.copy()
+    sub_preds_df['preds'] = None
+    for idx in tqdm(range(len(all_test_exp))):
         #print('Experiment', idx)
         indices = (test_df.experiment == all_test_exp[idx])
 
@@ -61,6 +81,27 @@ if __name__ == '__main__':
 
         preds = select_plate_group(preds, idx)
         sub.loc[indices, 'sirna'] = preds.argmax(1)
+        idxes = sub_preds_df.loc[indices].index
+        for _idx, pred in zip(idxes, preds):
+            sub_preds_df.loc[_idx, 'preds'] = json.dumps(pred.tolist())
+        #sub_preds_df.loc[indices, 'preds'] = preds
+
+    sub_preds_df = sub_preds_df.set_index('id_code')
+    current_plate = None
+    plate_probabilities = []
+    predicted = []
+    for name in tqdm(sub['id_code']):
+        experiment, plate, _ = name.split('_')
+        if plate != current_plate:
+            if current_plate is not None:
+                predicted.extend([str(x) for x in assign_plate(plate_probabilities)])
+            plate_probabilities = []
+            current_plate = plate
+
+        score_predict = np.array(json.loads(sub_preds_df.loc[name].preds))
+        plate_probabilities.append(scipy.special.softmax(score_predict.squeeze()))
+    predicted.extend([str(x) for x in assign_plate(plate_probabilities)])
+    sub['sirna'] = predicted
 
     sub.to_csv(
         args.original_raw.replace(
