@@ -256,13 +256,12 @@ class Runner(object):
         self.model.train()
         running_loss = 0
 
-        for (ids, images, ctrl_images, labels, labels_dist, means, stds) in tqdm(loader):
+#####        for (ids, images, ctrl_images, labels, labels_dist, means, stds) in tqdm(loader):
+        for (ids, images, labels, labels_dist, means, stds) in tqdm(loader):
             images, labels = images.to(
                 self.device, dtype=torch.float), labels.to(
                 self.device)
-            # ctrl_images = ctrl_images.to(self.device, dtype=torch.float)
-            ctrl_images = ctrl_images.to('cpu')
-            del ctrl_images
+#####            ctrl_images = ctrl_images.to(self.device, dtype=torch.float)
 #             if (
 #                     'normalize' in self.augment
 #                     or 'normalize_exp' in self.augment
@@ -552,7 +551,8 @@ class Runner(object):
             val_ids = val_ids[:300]
 
         train_loader = self._build_loader(
-            mode="train", ids=trn_ids, augment=self.augment, w_posneg=True)
+            mode="train", ids=trn_ids, augment=self.augment, w_posneg=False)
+#####            mode="train", ids=trn_ids, augment=self.augment, w_posneg=True)
         if 'normalize' in self.augment:
             augment = ['normalize']
         elif 'normalize_exp' in self.augment:
