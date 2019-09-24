@@ -1,7 +1,8 @@
 d_expescription: ews
 runner: r004
 device: cuda
-batch_size: 24
+# batch_size: 24
+batch_size: 96
 max_epoch: 40
 fobj: sce
 dlt_bias: false
