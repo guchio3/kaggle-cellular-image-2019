@@ -1,4 +1,4 @@
-d_expescription: ews
+d_expescription: check the correct arcface performance
 runner: r004
 device: cuda
 batch_size: 24
@@ -6,6 +6,7 @@ max_epoch: 40
 fobj: sce
 dlt_bias: false
 dlt_var: false
+easy_margin: false
 model:
     model_type: efficientnetb5_metric
     pretrained: true
