@@ -334,10 +334,11 @@ class Runner(object):
 #                     images -= means
 #                     images /= stds
 
-                if self.metric:
-                    outputs, features = self.model.forward(images, labels)
-                else:
-                    outputs = self.model.forward(images)
+#                 if self.metric:
+#                     outputs, features = self.model.forward(images, labels)
+#                 else:
+#                     outputs = self.model.forward(images)
+                outputs = self.model.forward(images)
                 if 'mixup' in self.augment:
                     labels_dist = labels_dist.to(self.device, dtype=torch.float)
                     valid_loss = self.fobj(outputs, labels_dist)
