@@ -256,12 +256,11 @@ class Runner(object):
         self.model.train()
         running_loss = 0
 
-#####        for (ids, images, ctrl_images, labels, labels_dist, means, stds) in tqdm(loader):
-        for (ids, images, labels, labels_dist, means, stds) in tqdm(loader):
+        for (ids, images, ctrl_images, labels, labels_dist, means, stds) in tqdm(loader):
             images, labels = images.to(
                 self.device, dtype=torch.float), labels.to(
                 self.device)
-#####            ctrl_images = ctrl_images.to(self.device, dtype=torch.float)
+            ctrl_images = ctrl_images.to(self.device, dtype=torch.float)
 #             if (
 #                     'normalize' in self.augment
 #                     or 'normalize_exp' in self.augment
@@ -287,10 +286,10 @@ class Runner(object):
                 train_loss += self.cosobj(features, ctrl_features, torch.ones(self.batch_size).to(self.device))
             elif self.metric:
                 outputs, features = self.model.forward(images, labels)
-                # pos_outputs, ctrl_features = self.model.forward(ctrl_images, labels)
+                pos_outputs, ctrl_features = self.model.forward(ctrl_images, labels)
                 train_loss = self.fobj(outputs, labels)
-                # train_loss += self.fobj(pos_outputs, labels)
-                # train_loss += self.cosobj(features, ctrl_features, torch.ones(self.batch_size).to(self.device))
+                train_loss += self.fobj(pos_outputs, labels)
+                train_loss += self.cosobj(features, ctrl_features, torch.ones(self.batch_size).to(self.device))
             else:
                 outputs = self.model.forward(images)
                 train_loss = self.fobj(outputs, labels)
@@ -334,11 +333,7 @@ class Runner(object):
 #                     images -= means
 #                     images /= stds
 
-#                 if self.metric:
-#                     outputs, features = self.model.forward(images, labels)
-#                 else:
-#                     outputs = self.model.forward(images)
-                outputs = self.model.forward(images)
+                outputs, features = self.model.forward(images)
                 if 'mixup' in self.augment:
                     labels_dist = labels_dist.to(self.device, dtype=torch.float)
                     valid_loss = self.fobj(outputs, labels_dist)
@@ -552,8 +547,8 @@ class Runner(object):
             val_ids = val_ids[:300]
 
         train_loader = self._build_loader(
-            mode="train", ids=trn_ids, augment=self.augment, w_posneg=False)
-#####            mode="train", ids=trn_ids, augment=self.augment, w_posneg=True)
+            mode="train", ids=trn_ids, augment=self.augment, w_posneg=True)
+#####            mode="train", ids=trn_ids, augment=self.augment, w_posneg=False)
         if 'normalize' in self.augment:
             augment = ['normalize']
         elif 'normalize_exp' in self.augment:
