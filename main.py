@@ -51,6 +51,7 @@ if __name__ == '__main__':
         cell_type = args.cell_types[0]
         runner.train_model(cell_type)
     else:
+        # sub_filename = './mnt/submissions/e083_2019-09-25-16-13-01_1.06221_11.00000_sub.csv'
         sub_filename = None
         for i, cell_type in enumerate(args.cell_types):
             sub_filename = runner.make_submission_file(cell_type, sub_filename)

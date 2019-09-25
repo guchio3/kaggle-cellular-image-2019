@@ -453,7 +453,7 @@ class Runner(object):
             temp_loss = float(split_filename[5])
             temp_acc = float(split_filename[6])
             # if temp_loss < best_loss:
-            if temp_acc > best_acc:
+            if temp_acc >= best_acc:
                 best_loss = temp_loss
                 best_acc = temp_acc
                 best_filename = filename
@@ -495,7 +495,8 @@ class Runner(object):
                 trn_df['sirna'],
                 split_num,
                 shuffle=True,
-                random_state=71)
+                random_state=71,
+                cell_type=cell_type)
         else:
             raise Exception(f'invalid split type: {split_type}')
         if cell_type not in ['ALL', 'HEPG2', 'U2OS', 'HUVEC', 'RPE']:

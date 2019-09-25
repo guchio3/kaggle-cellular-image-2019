@@ -69,11 +69,16 @@ def ExperimentwiseSplit(
 
 
 def WholeDataSplit(
-        X_df, y, n_splits=5, shuffle=False, random_state=71):
+        X_df, y, n_splits=5, shuffle=False, random_state=71, cell_type='ALL'):
 
     X_df = X_df.reset_index(drop=True)
     fold = [[[], []] for i in range(n_splits)]
-    fold[0][0] = X_df.iloc[5:].index.values
-    fold[0][1] = X_df.iloc[:5].index.values
+    if cell_type == 'ALL':
+        fold[0][0] = X_df.iloc[5:].index.values
+        fold[0][1] = X_df.iloc[:5].index.values
+    else:
+        is_val = (X_df.experiment.str.contains(cell_type)) & (X_df.well == 'B20')
+        fold[0][0] = X_df[~(is_val)].index.values
+        fold[0][1] = X_df[is_val].index.values
 
     return fold
