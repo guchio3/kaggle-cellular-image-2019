@@ -38,7 +38,12 @@ def _load_imgs_from_ids(id_pair, mode):
         _images = []
         for w in [1, 2, 3, 4, 5, 6]:
             # 0 means gray scale
-            img = cv2.imread(f'{filename_base}_s{site}_w{w}.png', 0)
+            if os.path.isfile(f'{filename_base}_s{site}_w{w}.png'):
+                img = cv2.imread(f'{filename_base}_s{site}_w{w}.png', 0)
+            else:
+                filename_base = f'./mnt/inputs/test/{split_id[0]}/' \
+                                f'Plate{split_id[1]}/{split_id[2]}'
+                img = cv2.imread(f'{filename_base}_s{site}_w{w}.png', 0)
             _images.append(img)
 #        images.append(
 #            np.array(_images).reshape(IMAGE_SIZE, IMAGE_SIZE, 6))
@@ -68,7 +73,8 @@ class CellularImageDataset(Dataset):
             plates = tst_df.loc[ids]['plate'].values
         else:  # train or valid
             trn_df = pd.read_csv(
-                './mnt/inputs/origin/train.csv.zip').set_index('id_code')
+                './mnt/inputs/origin/merged_df.csv').set_index('id_code')
+#                './mnt/inputs/origin/train.csv.zip').set_index('id_code')
             labels = trn_df.loc[ids]['sirna'].values
             plates = trn_df.loc[ids]['plate'].values
         self.ids, self.images, self.labels, self.sites, self.plates = self._parse_ids(

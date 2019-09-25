@@ -467,7 +467,8 @@ class Runner(object):
         return best_loss, best_acc
 
     def _trn_val_split(self, split_type, split_num, cell_type):
-        trn_df = pd.read_csv('./mnt/inputs/origin/train.csv.zip')
+        trn_df = pd.read_csv('./mnt/inputs/origin/merged_df.csv')
+        # trn_df = pd.read_csv('./mnt/inputs/origin/train.csv.zip')
 
         if split_type == 'gkf':
             fold = gkf(split_num).split(
