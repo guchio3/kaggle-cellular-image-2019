@@ -19,7 +19,7 @@ from tqdm import tqdm
 from adabound import AdaBound
 
 from ..datasets import CellularImageDataset, ImagesDS
-from ..models import (densenet121_metric, densenet201_metric, efficientnetb2,
+from ..models import (densenet121_metric, densenet161_metric, densenet169_metric, densenet201_metric, resnext101_metric, efficientnetb2,
                       efficientnetb2_metric, efficientnetb2_metric_bn,
                       efficientnetb2_metric_larger, efficientnetb4,
                       efficientnetb5, efficientnetb5_metric, efficientnetb6_metric, efficientnetb7, resnet18)
@@ -116,8 +116,14 @@ class Runner(object):
             model = efficientnetb6_metric.Network(pretrained, 1108, self.easy_margin)
         elif model_type == 'densenet121_metric':
             model = densenet121_metric.Network(pretrained, 1108)
+        elif model_type == 'densenet161_metric':
+            model = densenet161_metric.Network(pretrained, 1108)
+        elif model_type == 'densenet169_metric':
+            model = densenet169_metric.Network(pretrained, 1108)
         elif model_type == 'densenet201_metric':
             model = densenet201_metric.Network(pretrained, 1108)
+        elif model_type == 'resnext101_metric':
+            model = resnext101_metric.Network(pretrained, 1108)
         else:
             raise Exception(f'invalid model_type: {model_type}')
         # return model.to(self.device)
