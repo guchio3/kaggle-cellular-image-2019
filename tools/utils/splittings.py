@@ -66,3 +66,14 @@ def ExperimentwiseSplit(
     fold[0][1] = X_df[is_val].index.values
 
     return fold
+
+
+def WholeDataSplit(
+        X_df, y, n_splits=5, shuffle=False, random_state=71):
+
+    X_df = X_df.reset_index(drop=True)
+    fold = [[[], []] for i in range(n_splits)]
+    fold[0][0] = X_df.iloc[5:].index.values
+    fold[0][1] = X_df.iloc[:5].index.values
+
+    return fold

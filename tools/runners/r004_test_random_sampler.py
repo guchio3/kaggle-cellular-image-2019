@@ -22,12 +22,13 @@ from ..datasets import CellularImageDataset, ImagesDS
 from ..models import (densenet121_metric, densenet201_metric, efficientnetb2,
                       efficientnetb2_metric, efficientnetb2_metric_bn,
                       efficientnetb2_metric_larger, efficientnetb4,
-                      efficientnetb5, efficientnetb5_metric, efficientnetb7, resnet18)
+                      efficientnetb5, efficientnetb5_metric, efficientnetb6_metric, efficientnetb7, resnet18)
 from ..schedulers import CosineAnnealingWarmUpRestarts as cawur
 from ..schedulers import pass_scheduler
 from ..utils.logs import sel_log, send_line_notification
 from ..utils.splittings import CellwiseStratifiedKFold as cskf
 from ..utils.splittings import ExperimentwiseSplit as ews
+from ..utils.splittings import WholeDataSplit as wds
 
 
 def cross_entropy(pred, soft_targets):
@@ -111,6 +112,8 @@ class Runner(object):
             model = efficientnetb2_metric_larger.Network(pretrained, 1108)
         elif model_type == 'efficientnetb5_metric':
             model = efficientnetb5_metric.Network(pretrained, 1108, self.easy_margin)
+        elif model_type == 'efficientnetb6_metric':
+            model = efficientnetb6_metric.Network(pretrained, 1108, self.easy_margin)
         elif model_type == 'densenet121_metric':
             model = densenet121_metric.Network(pretrained, 1108)
         elif model_type == 'densenet201_metric':
@@ -219,11 +222,11 @@ class Runner(object):
             # data_source=dataset.image_files)
         return sampler
 
-    def _build_loader(self, mode, ids, augment, batch_size=None):
+    def _build_loader(self, mode, ids, augment, batch_size=None, valid=False):
         dataset = CellularImageDataset(mode, ids, augment)
         # dataset = ImagesDS(ids, './mnt/inputs/', mode)
         sampler = self._get_sampler(dataset, mode, self.sampler_type)
-        drop_last = True if mode == 'train' else False
+        drop_last = True if mode == 'train' and not valid else False
 #        shuffle = True if mode == 'train' else False
         if not batch_size:
             # specify for evaluation
@@ -480,6 +483,13 @@ class Runner(object):
                 split_num,
                 shuffle=True,
                 random_state=71)
+        elif split_type == 'wds':
+            fold = wds(
+                trn_df,
+                trn_df['sirna'],
+                split_num,
+                shuffle=True,
+                random_state=71)
         else:
             raise Exception(f'invalid split type: {split_type}')
         if cell_type not in ['ALL', 'HEPG2', 'U2OS', 'HUVEC', 'RPE']:
@@ -547,7 +557,7 @@ class Runner(object):
         else:
             augment = []
         valid_loader = self._build_loader(
-            mode="train", ids=val_ids, augment=augment)
+            mode="train", ids=val_ids, augment=augment, valid=True)
 
         # load and apply checkpoint if needed
         if self.checkpoint:
